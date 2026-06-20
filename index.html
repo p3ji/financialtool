@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DB Early Retirement Calculator</title>
+    <meta name="description" content="An early retirement calculator tailored for individuals with a Defined Benefit pension plan.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-background"></div>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h1>DB Retire<span>Plan</span></h1>
+            </div>
+            <p class="subtitle">Early Retirement Calculator for Defined Benefit Pensions</p>
+        </header>
+
+        <main class="dashboard">
+            <!-- Left Column: Inputs -->
+            <section class="glass-panel inputs-section">
+                <h2>Your Financial Profile</h2>
+                
+                <div class="input-group">
+                    <label for="currentAge">Current Age</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="currentAge" value="35" min="18" max="100">
+                        <span class="unit">Yrs</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="currentBalance">Current Portfolio Balance</label>
+                    <div class="input-wrapper">
+                        <span class="currency">$</span>
+                        <input type="number" id="currentBalance" value="100000" min="0" step="1000">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="annualIncome">Annual Income (Post-Tax)</label>
+                    <div class="input-wrapper">
+                        <span class="currency">$</span>
+                        <input type="number" id="annualIncome" value="80000" min="0" step="1000">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="annualExpenses">Annual Expenses</label>
+                    <div class="input-wrapper">
+                        <span class="currency">$</span>
+                        <input type="number" id="annualExpenses" value="50000" min="0" step="1000">
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+                <h2>Pension Details</h2>
+
+                <div class="input-group">
+                    <label for="pensionAge">Age Pension Begins</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="pensionAge" value="60" min="40" max="80">
+                        <span class="unit">Yrs</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="pensionAmount">DB Pension Annual Amount</label>
+                    <div class="input-wrapper">
+                        <span class="currency">$</span>
+                        <input type="number" id="pensionAmount" value="30000" min="0" step="1000">
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+                <h2>Assumptions</h2>
+
+                <div class="input-group-row">
+                    <div class="input-group half">
+                        <label for="roi">Annual Return</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="roi" value="5.0" min="0" max="20" step="0.1">
+                            <span class="unit">%</span>
+                        </div>
+                    </div>
+                    <div class="input-group half">
+                        <label for="swr">Withdrawal Rate</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="swr" value="4.0" min="1" max="10" step="0.1">
+                            <span class="unit">%</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Column: Results & Chart -->
+            <section class="results-section">
+                <!-- Summary Cards -->
+                <div class="summary-cards">
+                    <div class="glass-panel card highlight-card">
+                        <h3>Time to Retirement</h3>
+                        <div class="value" id="resYearsToRetirement">--</div>
+                        <div class="subtext">Retire at age <span id="resRetirementAge">--</span></div>
+                    </div>
+                    
+                    <div class="glass-panel card">
+                        <h3>Target Portfolio</h3>
+                        <div class="value" id="resTargetPortfolio">--</div>
+                        <div class="subtext">Needed at retirement</div>
+                    </div>
+
+                    <div class="glass-panel card">
+                        <h3>Annual Savings</h3>
+                        <div class="value" id="resAnnualSavings">--</div>
+                        <div class="subtext">Savings rate: <span id="resSavingsRate">--</span></div>
+                    </div>
+                </div>
+
+                <!-- Chart Panel -->
+                <div class="glass-panel chart-panel">
+                    <div class="chart-header">
+                        <h2>Portfolio Projection</h2>
+                        <div id="chartStatus" class="badge">Calculating...</div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="retirementChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Timeline Info -->
+                <div class="glass-panel timeline-panel" id="timelinePanel">
+                    <h3>Retirement Timeline</h3>
+                    <ul class="timeline">
+                        <li class="timeline-item">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                <h4>Today (Age <span id="tlCurrentAge">--</span>)</h4>
+                                <p>Starting with <span id="tlCurrentBalance">--</span></p>
+                            </div>
+                        </li>
+                        <li class="timeline-item highlight" id="tlRetirementItem">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                <h4>Retirement (Age <span id="tlRetirementAge">--</span>)</h4>
+                                <p>Portfolio reaches <span id="tlRetirementBalance">--</span>. Portfolio funds 100% of expenses (<span id="tlExpenses">--</span>/yr) during the gap phase.</p>
+                            </div>
+                        </li>
+                        <li class="timeline-item" id="tlPensionItem">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                <h4>Pension Starts (Age <span id="tlPensionAge">--</span>)</h4>
+                                <p>Pension provides <span id="tlPensionAmount">--</span>/yr. Portfolio covers the remaining <span id="tlRemainingExpenses">--</span>/yr.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
