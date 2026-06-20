@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Methodology - DB Early Retirement Calculator</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .methodology-content {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 3rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .methodology-content h2 {
+            font-family: var(--font-heading);
+            color: var(--accent-color);
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            font-size: 1.75rem;
+        }
+
+        .methodology-content h3 {
+            color: #ffffff;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.25rem;
+        }
+
+        .methodology-content p {
+            margin-bottom: 1.25rem;
+            color: var(--text-muted);
+            line-height: 1.7;
+        }
+
+        .methodology-content ul {
+            margin-bottom: 1.5rem;
+            padding-left: 1.5rem;
+            color: var(--text-muted);
+            line-height: 1.7;
+        }
+
+        .methodology-content li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .math-block {
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 4px solid var(--accent-color);
+            padding: 1rem 1.5rem;
+            border-radius: 4px;
+            font-family: monospace;
+            color: var(--text-main);
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-background"></div>
+    <nav class="top-nav">
+        <a href="index.html">Calculator</a>
+        <a href="methodology.html" class="active">Methodology</a>
+    </nav>
+
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h1>DB Retire<span>Plan</span></h1>
+            </div>
+            <p class="subtitle">Calculation Methodology & Assumptions</p>
+        </header>
+
+        <main class="methodology-content">
+            <h2>Overview</h2>
+            <p>
+                Standard "FIRE" (Financial Independence, Retire Early) calculators operate on a single assumption: your investment portfolio must cover your expenses forever. 
+                However, for individuals with a Defined Benefit (DB) pension plan—such as federal public servants—retirement often consists of multiple distinct financial phases.
+            </p>
+            <p>
+                This calculator uses month-by-month compounding to determine exactly when your investment portfolio reaches the critical mass needed to bridge the gap to your pension, 
+                and subsequently sustain you for the rest of your life.
+            </p>
+
+            <h2>The Four Phases of Early Retirement</h2>
+
+            <h3>1. The Accumulation Phase</h3>
+            <p>
+                This is the period from your current age until your retirement date. During this phase, you are actively working and saving.
+            </p>
+            <div class="math-block">
+                Portfolio = Previous Portfolio × (1 + Monthly ROI) + (Annual Savings ÷ 12)
+            </div>
+
+            <h3>2. The Gap Phase (Early Retirement to Pension Start)</h3>
+            <p>
+                If you retire before your pension begins, you enter the "Gap Phase". During this time, you have no employment income and no pension income. Your portfolio must cover <strong>100%</strong> of your expenses.
+            </p>
+            <div class="math-block">
+                Portfolio = Previous Portfolio × (1 + Monthly ROI) - (Annual Expenses ÷ 12)
+            </div>
+
+            <h3>3. The Bridge Phase (Pension Start to Age 65)</h3>
+            <p>
+                <strong>(Only applicable in MyGCPension Mode)</strong><br>
+                When your pension begins, your reliance on your portfolio drops significantly. If you are under 65, the public service pension typically pays a "Lifetime Pension" plus a temporary "Bridge Benefit". 
+                Your portfolio now only needs to cover the shortfall between your total expenses and your total pension income.
+            </p>
+            <div class="math-block">
+                Shortfall = Math.max(0, Expenses - Lifetime Pension - Bridge Benefit)<br>
+                Portfolio = Previous Portfolio × (1 + Monthly ROI) - (Shortfall ÷ 12)
+            </div>
+
+            <h3>4. The Lifetime Phase (Age 65+)</h3>
+            <p>
+                At age 65, the Bridge Benefit ceases (as this is when unreduced CPP is assumed to begin). Your pension income drops to the "Lifetime Pension" amount. Your portfolio withdrawals must increase slightly to cover the lost bridge benefit.
+            </p>
+            <div class="math-block">
+                Shortfall = Math.max(0, Expenses - Lifetime Pension)<br>
+                Target Portfolio Required at Age 65 = Shortfall ÷ Safe Withdrawal Rate
+            </div>
+
+            <h2>Key Assumptions</h2>
+            <ul>
+                <li><strong>Inflation & Real Returns:</strong> This calculator operates using "real returns". We assume the Annual Return input is already adjusted for inflation. By ignoring inflation, we keep all financial figures in "today's dollars" for easier comprehension.</li>
+                <li><strong>Safe Withdrawal Rate (SWR):</strong> Used to calculate the terminal target portfolio. If you need $20,000 a year from your portfolio post-65, and your SWR is 4%, the calculator ensures your portfolio reaches $500,000 ($20k / 0.04) by age 65.</li>
+                <li><strong>Bridge Benefit End Age:</strong> The calculator strictly assumes the Bridge Benefit terminates precisely at age 65, aligning with standard Canadian public service pension plan structures.</li>
+                <li><strong>Compounding Frequency:</strong> Growth and withdrawals are simulated on a monthly basis to provide an exact "months to retirement" figure.</li>
+            </ul>
+        </main>
+    </div>
+</body>
+</html>

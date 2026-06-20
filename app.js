@@ -14,6 +14,19 @@ const inputs = {
     swr: document.getElementById('swr')
 };
 
+const gcInputs = {
+    gcPensionAge: document.getElementById('gcPensionAge'),
+    gcLifetimePension: document.getElementById('gcLifetimePension'),
+    gcBridgeBenefit: document.getElementById('gcBridgeBenefit')
+};
+
+const toggles = {
+    btnSimpleMode: document.getElementById('btnSimpleMode'),
+    btnGCMode: document.getElementById('btnGCMode'),
+    simpleDbInputs: document.getElementById('simpleDbInputs'),
+    gcDbInputs: document.getElementById('gcDbInputs')
+};
+
 const results = {
     yearsToRetirement: document.getElementById('resYearsToRetirement'),
     retirementAge: document.getElementById('resRetirementAge'),
@@ -38,25 +51,98 @@ const timeline = {
 
 const chartStatus = document.getElementById('chartStatus');
 let retirementChartInstance = null;
+let isGCMode = false;
 
 // Event Listeners
 Object.values(inputs).forEach(input => {
     input.addEventListener('input', calculateRetirement);
 });
+Object.values(gcInputs).forEach(input => {
+    input.addEventListener('input', calculateRetirement);
+});
+
+toggles.btnSimpleMode.addEventListener('click', () => {
+    isGCMode = false;
+    toggles.btnSimpleMode.classList.add('active');
+    toggles.btnGCMode.classList.remove('active');
+    toggles.simpleDbInputs.style.display = 'block';
+    toggles.gcDbInputs.style.display = 'none';
+    calculateRetirement();
+});
+
+toggles.btnGCMode.addEventListener('click', () => {
+    isGCMode = true;
+    toggles.btnGCMode.classList.add('active');
+    toggles.btnSimpleMode.classList.remove('active');
+    toggles.gcDbInputs.style.display = 'block';
+    toggles.simpleDbInputs.style.display = 'none';
+    calculateRetirement();
+});
 
 // Initial Calculation
 calculateRetirement();
 
+function getRequiredBalanceAtAge(currentAge, pensionAge, expenses, lifetimePension, bridgeBenefit, swrDecimal, rMonthly) {
+    let targetAt65 = Math.max(0, expenses - lifetimePension) / swrDecimal;
+    let req = 0;
+    
+    if (currentAge >= 65) {
+        req = targetAt65;
+    } else if (currentAge >= pensionAge) {
+        // In bridge phase (Pension started, but under 65)
+        let monthsTo65 = Math.ceil((65 - currentAge) * 12);
+        req = targetAt65;
+        let monthlyGap = Math.max(0, expenses - lifetimePension - bridgeBenefit) / 12;
+        for (let i = 0; i < monthsTo65; i++) {
+            req = (req + monthlyGap) / (1 + rMonthly);
+        }
+    } else {
+        // Gap phase (Pre-pension)
+        let monthsToPension = Math.ceil((pensionAge - currentAge) * 12);
+        
+        // Calculate req at pension age
+        let reqAtPensionAge = 0;
+        if (pensionAge >= 65) {
+            reqAtPensionAge = targetAt65;
+        } else {
+            let monthsTo65FromPension = Math.ceil((65 - pensionAge) * 12);
+            let r = targetAt65;
+            let monthlyGap = Math.max(0, expenses - lifetimePension - bridgeBenefit) / 12;
+            for (let i = 0; i < monthsTo65FromPension; i++) {
+                r = (r + monthlyGap) / (1 + rMonthly);
+            }
+            reqAtPensionAge = r;
+        }
+
+        req = reqAtPensionAge;
+        let monthlyGap = expenses / 12; // Pre-pension gap is 100% expenses
+        for (let i = 0; i < monthsToPension; i++) {
+            req = (req + monthlyGap) / (1 + rMonthly);
+        }
+    }
+    return req;
+}
+
 function calculateRetirement() {
-    // Parse inputs
+    // Parse common inputs
     const age = parseFloat(inputs.currentAge.value) || 0;
     const balance = parseFloat(inputs.currentBalance.value) || 0;
     const income = parseFloat(inputs.annualIncome.value) || 0;
     const expenses = parseFloat(inputs.annualExpenses.value) || 0;
-    const pensionAge = parseFloat(inputs.pensionAge.value) || 0;
-    const pensionAmount = parseFloat(inputs.pensionAmount.value) || 0;
     const roiAnnual = parseFloat(inputs.roi.value) || 0;
     const swr = parseFloat(inputs.swr.value) || 0;
+
+    // Parse Pension inputs based on mode
+    let pensionAge, lifetimePension, bridgeBenefit;
+    if (isGCMode) {
+        pensionAge = parseFloat(gcInputs.gcPensionAge.value) || 0;
+        lifetimePension = parseFloat(gcInputs.gcLifetimePension.value) || 0;
+        bridgeBenefit = parseFloat(gcInputs.gcBridgeBenefit.value) || 0;
+    } else {
+        pensionAge = parseFloat(inputs.pensionAge.value) || 0;
+        lifetimePension = parseFloat(inputs.pensionAmount.value) || 0;
+        bridgeBenefit = 0;
+    }
 
     const savings = income - expenses;
     const savingsRate = income > 0 ? (savings / income) * 100 : 0;
@@ -67,13 +153,9 @@ function calculateRetirement() {
     results.annualSavings.innerText = formatCurrency(savings);
     results.savingsRate.innerText = formatNumber(savingsRate) + '%';
     
-    if (savings <= 0 && expenses > 0) {
-        // Special case: Not saving anything. Check if current balance is already enough.
-    }
-
-    // Target portfolio at pension age
-    const postPensionExpenses = Math.max(0, expenses - pensionAmount);
-    const targetPostPension = postPensionExpenses / swrDecimal;
+    // Target portfolio at post-65
+    const post65Expenses = Math.max(0, expenses - lifetimePension);
+    const targetPost65 = post65Expenses / swrDecimal;
 
     // Simulation variables
     let currentBal = balance;
@@ -86,19 +168,7 @@ function calculateRetirement() {
     for (let m = 0; m <= maxMonths; m++) {
         let currentAge = age + (m / 12);
         
-        // Calculate REQUIRED balance to retire at currentAge
-        let requiredBalance = 0;
-        if (currentAge >= pensionAge) {
-            requiredBalance = targetPostPension;
-        } else {
-            // Gap phase calculation: work backwards from pension age
-            let monthsToPension = Math.ceil((pensionAge - currentAge) * 12);
-            let req = targetPostPension;
-            for (let i = 0; i < monthsToPension; i++) {
-                req = (req + expenses / 12) / (1 + rMonthly);
-            }
-            requiredBalance = req;
-        }
+        let requiredBalance = getRequiredBalanceAtAge(currentAge, pensionAge, expenses, lifetimePension, bridgeBenefit, swrDecimal, rMonthly);
 
         if (currentBal >= requiredBalance && !retired) {
             retired = true;
@@ -110,33 +180,20 @@ function calculateRetirement() {
     }
 
     if (!retired) {
-        // Never retired by age 100
         results.yearsToRetirement.innerText = "N/A";
         results.retirementAge.innerText = "100+";
         results.targetPortfolio.innerText = "N/A";
         chartStatus.innerText = "Will not reach goal";
         chartStatus.style.color = "#ef4444";
         timeline.panel.style.display = "none";
-        renderChart([], 0, 0);
+        renderChart([], 0, 0, false);
         return;
     }
 
     // Found retirement date!
     const yearsToRetire = monthsToRetirement / 12;
     const retireAge = age + yearsToRetire;
-    
-    // Exact target at retirement
-    let requiredBalanceAtRetirement = 0;
-    if (retireAge >= pensionAge) {
-        requiredBalanceAtRetirement = targetPostPension;
-    } else {
-        let monthsToPension = Math.ceil((pensionAge - retireAge) * 12);
-        let req = targetPostPension;
-        for (let i = 0; i < monthsToPension; i++) {
-            req = (req + expenses / 12) / (1 + rMonthly);
-        }
-        requiredBalanceAtRetirement = req;
-    }
+    const requiredBalanceAtRetirement = getRequiredBalanceAtAge(retireAge, pensionAge, expenses, lifetimePension, bridgeBenefit, swrDecimal, rMonthly);
 
     // Update Results UI
     results.yearsToRetirement.innerText = formatNumber(yearsToRetire) + " yrs";
@@ -157,12 +214,22 @@ function calculateRetirement() {
     if (retireAge < pensionAge) {
         timeline.pensionItem.style.display = "block";
         timeline.pensionAge.innerText = formatNumber(pensionAge);
-        timeline.pensionAmount.innerText = formatCurrency(pensionAmount);
-        timeline.remainingExpenses.innerText = formatCurrency(postPensionExpenses);
+        let currentPensionStartAmt = lifetimePension + bridgeBenefit;
+        timeline.pensionAmount.innerText = formatCurrency(currentPensionStartAmt);
+        
+        let remainingExp = Math.max(0, expenses - currentPensionStartAmt);
+        timeline.remainingExpenses.innerText = formatCurrency(remainingExp);
+        
+        if (isGCMode && bridgeBenefit > 0) {
+            document.querySelector('#tlPensionItem p').innerText = `Pension provides ${formatCurrency(currentPensionStartAmt)}/yr (${formatCurrency(lifetimePension)} lifetime + ${formatCurrency(bridgeBenefit)} bridge). Portfolio covers the remaining ${formatCurrency(remainingExp)}/yr. Bridge benefit ends at age 65.`;
+        } else {
+            document.querySelector('#tlPensionItem p').innerText = `Pension provides ${formatCurrency(currentPensionStartAmt)}/yr. Portfolio covers the remaining ${formatCurrency(remainingExp)}/yr.`;
+        }
     } else {
         timeline.pensionItem.style.display = "none";
-        // If they retire after pension age, gap phase text doesn't apply
-        document.querySelector('#tlRetirementItem p').innerText = `Portfolio reaches ${formatCurrency(requiredBalanceAtRetirement)}. Pension provides ${formatCurrency(pensionAmount)}/yr. Portfolio covers the remaining ${formatCurrency(postPensionExpenses)}/yr.`;
+        let currentPensionStartAmt = lifetimePension + (retireAge < 65 ? bridgeBenefit : 0);
+        let remainingExp = Math.max(0, expenses - currentPensionStartAmt);
+        document.querySelector('#tlRetirementItem p').innerText = `Portfolio reaches ${formatCurrency(requiredBalanceAtRetirement)}. Pension provides ${formatCurrency(currentPensionStartAmt)}/yr. Portfolio covers the remaining ${formatCurrency(remainingExp)}/yr.`;
     }
 
     // Generate Full Chart Data
@@ -170,7 +237,7 @@ function calculateRetirement() {
     for (let m = 0; m <= maxMonths; m++) {
         let currentAge = age + (m / 12);
         
-        if (m % 12 === 0 || m === monthsToRetirement || Math.abs(currentAge - pensionAge) < 0.05) {
+        if (m % 12 === 0 || m === monthsToRetirement || Math.abs(currentAge - pensionAge) < 0.05 || Math.abs(currentAge - 65) < 0.05) {
             simData.push({
                 x: currentAge,
                 y: chartBal
@@ -185,24 +252,29 @@ function calculateRetirement() {
             if (currentAge < pensionAge) {
                 // Gap
                 chartBal = chartBal * (1 + rMonthly) - (expenses / 12);
+            } else if (currentAge < 65) {
+                // Bridge Phase
+                let monthlyGap = Math.max(0, expenses - lifetimePension - bridgeBenefit) / 12;
+                chartBal = chartBal * (1 + rMonthly) - monthlyGap;
             } else {
-                // Post-pension
-                chartBal = chartBal * (1 + rMonthly) - (postPensionExpenses / 12);
+                // Post-65
+                let monthlyGap = Math.max(0, expenses - lifetimePension) / 12;
+                chartBal = chartBal * (1 + rMonthly) - monthlyGap;
             }
         }
     }
 
-    renderChart(simData, retireAge, pensionAge);
+    renderChart(simData, retireAge, pensionAge, isGCMode && bridgeBenefit > 0);
 }
 
-function renderChart(data, retireAge, pensionAge) {
+function renderChart(data, retireAge, pensionAge, showAge65) {
     const ctx = document.getElementById('retirementChart').getContext('2d');
     
     if (retirementChartInstance) {
         retirementChartInstance.destroy();
     }
 
-    // Prepare vertical annotations (we'll just draw them using a plugin)
+    // Prepare vertical annotations
     const verticalLinePlugin = {
         id: 'verticalLines',
         afterDraw: (chart) => {
@@ -240,6 +312,21 @@ function renderChart(data, retireAge, pensionAge) {
                     
                     ctx.fillStyle = '#8b5cf6';
                     ctx.fillText('Pension Starts', xPension + 5, yAxis.top + 30);
+                }
+            }
+
+            // Draw Age 65 Line (if applicable in GC Mode)
+            if (showAge65 && retireAge < 65) {
+                const x65 = xAxis.getPixelForValue(65);
+                if (x65 >= xAxis.left && x65 <= xAxis.right) {
+                    ctx.beginPath();
+                    ctx.moveTo(x65, yAxis.top);
+                    ctx.lineTo(x65, yAxis.bottom);
+                    ctx.strokeStyle = '#f59e0b'; // amber accent
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.fillText('Bridge Ends (65)', x65 + 5, yAxis.top + 45);
                 }
             }
 

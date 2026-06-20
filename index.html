@@ -15,6 +15,11 @@
 </head>
 <body>
     <div class="app-background"></div>
+    <nav class="top-nav">
+        <a href="index.html" class="active">Calculator</a>
+        <a href="methodology.html">Methodology</a>
+    </nav>
+
     <div class="container">
         <header>
             <div class="logo">
@@ -63,20 +68,53 @@
 
                 <div class="divider"></div>
                 <h2>Pension Details</h2>
+                
+                <div class="mode-toggle">
+                    <button class="toggle-btn active" id="btnSimpleMode">Simple DB</button>
+                    <button class="toggle-btn" id="btnGCMode">MyGCPension</button>
+                </div>
 
-                <div class="input-group">
-                    <label for="pensionAge">Age Pension Begins</label>
-                    <div class="input-wrapper">
-                        <input type="number" id="pensionAge" value="60" min="40" max="80">
-                        <span class="unit">Yrs</span>
+                <div id="simpleDbInputs">
+                    <div class="input-group">
+                        <label for="pensionAge">Age Pension Begins</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="pensionAge" value="60" min="40" max="80">
+                            <span class="unit">Yrs</span>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="pensionAmount">DB Pension Annual Amount</label>
+                        <div class="input-wrapper">
+                            <span class="currency">$</span>
+                            <input type="number" id="pensionAmount" value="30000" min="0" step="1000">
+                        </div>
                     </div>
                 </div>
 
-                <div class="input-group">
-                    <label for="pensionAmount">DB Pension Annual Amount</label>
-                    <div class="input-wrapper">
-                        <span class="currency">$</span>
-                        <input type="number" id="pensionAmount" value="30000" min="0" step="1000">
+                <div id="gcDbInputs" style="display: none;">
+                    <div class="input-group">
+                        <label for="gcPensionAge">Age Pension Begins</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="gcPensionAge" value="60" min="40" max="80">
+                            <span class="unit">Yrs</span>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="gcLifetimePension">Annual Lifetime Pension</label>
+                        <div class="input-wrapper">
+                            <span class="currency">$</span>
+                            <input type="number" id="gcLifetimePension" value="20000" min="0" step="1000">
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="gcBridgeBenefit">Annual Bridge Benefit (stops at 65)</label>
+                        <div class="input-wrapper">
+                            <span class="currency">$</span>
+                            <input type="number" id="gcBridgeBenefit" value="10000" min="0" step="1000">
+                        </div>
                     </div>
                 </div>
 
