@@ -197,6 +197,64 @@ if (btnToggleTable && detailedTableContainer) {
     });
 }
 
+// Load saved form state from localStorage
+function loadFormState() {
+    const saved = localStorage.getItem('calculatorState');
+    if (!saved) return;
+
+    try {
+        const state = JSON.parse(saved);
+        Object.entries(state).forEach(([id, value]) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (el.type === 'checkbox') {
+                el.checked = value;
+                el.dispatchEvent(new Event('change'));
+            } else {
+                el.value = value;
+            }
+        });
+    } catch (e) {
+        console.error('Error loading form state:', e);
+    }
+}
+
+// Save form state to localStorage
+function saveFormState() {
+    const state = {};
+    const elements = ['currentAge', 'plannedRetirementAge', 'annualIncome', 'annualExpenses',
+                     'currentBalance', 'roi', 'swr', 'pensionAge', 'pensionAmount',
+                     'gcPensionAge', 'gcLifetimePension', 'gcBridgeBenefit',
+                     'cppStartAge', 'cppAmountAt65', 'oasStartAge', 'oasAmountAt65',
+                     'rrspBalance', 'tfasaBalance', 'nonRegBalance', 'incomePropertyValue', 'rentalIncome',
+                     'chkIncludeRetAge', 'chkIncludePortfolio', 'chkIncludePension', 'chkIncludeCppOas',
+                     'btnSimpleMode', 'btnGCMode', 'btnPortfolioSimple', 'btnPortfolioDetailed'];
+
+    elements.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.type === 'checkbox') {
+            state[id] = el.checked;
+        } else if (el.classList?.contains('toggle-btn')) {
+            // Skip toggle buttons - they're controlled by other state
+        } else {
+            state[id] = el.value;
+        }
+    });
+
+    localStorage.setItem('calculatorState', JSON.stringify(state));
+}
+
+// Load on page load
+loadFormState();
+
+// Save before unload
+window.addEventListener('beforeunload', saveFormState);
+
+// Also save on input changes
+document.addEventListener('change', saveFormState);
+document.addEventListener('input', saveFormState);
+
 calculateRetirement();
 
 // -------------------------------------------------------------------
