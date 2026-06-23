@@ -80,6 +80,17 @@ body {
     border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
+@media (max-width: 480px) {
+    .top-nav {
+        gap: 0.5rem;
+        padding: 1rem 0.5rem;
+    }
+    .top-nav a {
+        font-size: 0.875rem;
+        padding: 0.5rem 0.6rem;
+    }
+}
+
 .container {
     max-width: 1200px;
     margin: 0 auto;

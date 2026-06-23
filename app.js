@@ -109,6 +109,7 @@ const timelineList  = document.querySelector('#timelinePanel .timeline');
 const chartStatus = document.getElementById('chartStatus');
 let retirementChartInstance = null;
 let isGCMode = false;
+let lastReportData = null;
 
 // -------------------------------------------------------------------
 // Event Listeners
@@ -1107,8 +1108,6 @@ function updateDemographicBenchmarks() {
 // Report Tab
 // ============================================================
 
-let lastReportData = null;
-
 function renderReport(data) {
     lastReportData = data;
     const panel = document.getElementById('reportPanel');
@@ -1521,17 +1520,20 @@ function rptAssumptions(d) {
     const tabReport = document.getElementById('navTabReport');
     if (!tabCalc || !tabReport) return;
 
-    const dashboard = document.querySelector('.dashboard');
-    const compPanel = document.getElementById('comparisonPanel');
-    const repPanel  = document.getElementById('reportPanel');
+    const dashboard   = document.querySelector('.dashboard');
+    const compPanel   = document.getElementById('comparisonPanel');
+    const repPanel    = document.getElementById('reportPanel');
+    const mainHeader  = document.querySelector('.container > header');
 
     function setView(view) {
         const isReport = view === 'report';
-        dashboard.style.display = isReport ? 'none' : '';
-        compPanel.style.display = isReport ? 'none' : '';
-        repPanel.style.display  = isReport ? 'block' : 'none';
+        dashboard.style.display  = isReport ? 'none' : '';
+        compPanel.style.display  = isReport ? 'none' : '';
+        repPanel.style.display   = isReport ? 'block' : 'none';
+        if (mainHeader) mainHeader.style.display = isReport ? 'none' : '';
         tabCalc.classList.toggle('active', !isReport);
         tabReport.classList.toggle('active', isReport);
+        if (isReport) window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     tabCalc.addEventListener('click',   e => { e.preventDefault(); setView('calculator'); });
