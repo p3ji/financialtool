@@ -635,17 +635,18 @@ function calculateRetirement() {
         </li>` });
         }
         if (includeCppOas && cppAmount > 0 && cppAge > age) {
-            const cppTitle = (oasAge === cppAge) ? `CPP &amp; OAS Start (Age ${formatNumber(cppAge)})` : `CPP Starts (Age ${formatNumber(cppAge)})`;
+            const combinedWithOasP = oasAmount > 0 && oasAge === cppAge;
+            const cppTitleP = combinedWithOasP ? `CPP &amp; OAS Start (Age ${formatNumber(cppAge)})` : `CPP Starts (Age ${formatNumber(cppAge)})`;
             partialEvents.push({ age: cppAge, html: `
         <li class="timeline-item timeline-cpp">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
-                <h4>${cppTitle}</h4>
+                <h4>${cppTitleP}</h4>
                 <p>${describeIncomeAt(cppAge, expenses, benefits, isGCMode)}</p>
             </div>
         </li>` });
         }
-        if (includeCppOas && oasAmount > 0 && oasAge !== cppAge && oasAge > age) {
+        if (includeCppOas && oasAmount > 0 && oasAge > age && !(cppAmount > 0 && oasAge === cppAge)) {
             partialEvents.push({ age: oasAge, html: `
         <li class="timeline-item timeline-oas">
             <div class="timeline-marker"></div>
@@ -696,9 +697,11 @@ function calculateRetirement() {
         if (targetSplitRow) targetSplitRow.style.display = 'none';
     }
 
-    chartStatus.innerText   = fiAge <= plannedRetAge ? "FI before retirement" : "FI after retirement";
+    const fiBeforeRet = includeRetAge && fiAge <= plannedRetAge;
+    const fiAfterRet  = includeRetAge && fiAge > plannedRetAge;
+    chartStatus.innerText   = fiBeforeRet ? "FI before retirement" : fiAfterRet ? "FI after retirement" : "FI achieved";
     chartStatus.style.color = "";
-    chartStatus.className   = "badge " + (fiAge <= plannedRetAge ? "badge-success" : "badge-info");
+    chartStatus.className   = "badge " + (fiAfterRet ? "badge-info" : "badge-success");
     if (btnToggleTable) btnToggleTable.style.display = 'inline-block';
 
     // Portfolio balance at the employment retirement date (for timeline)
@@ -746,8 +749,19 @@ function calculateRetirement() {
     // Collect events — each has a sort key (age) and an HTML string
     const events = [];
 
-    // Today (always first)
-    events.push({ age: age, html: `
+    // Today — if already FI (fiMonth=0), merge with FI into one item to avoid duplicate at same age
+    const alreadyFI = main.fiMonth === 0;
+    if (alreadyFI) {
+        events.push({ age, html: `
+        <li class="timeline-item highlight">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>Already Financially Independent (Age ${formatNumber(age)})</h4>
+                <p>Portfolio of ${formatCurrency(balance)} already meets the target of ${formatCurrency(fiPortfolio)}. ${fiDesc}</p>
+            </div>
+        </li>` });
+    } else {
+        events.push({ age, html: `
         <li class="timeline-item">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
@@ -755,6 +769,7 @@ function calculateRetirement() {
                 <p>Starting with ${formatCurrency(balance)} in investment portfolio</p>
             </div>
         </li>` });
+    }
 
     // Employment Retirement (only if user added it and it differs meaningfully from FI)
     if (includeRetAge && Math.abs(plannedRetAge - fiAge) > 0.1) {
@@ -778,8 +793,9 @@ function calculateRetirement() {
         </li>` });
     }
 
-    // Financial Independence
-    events.push({ age: fiAge, html: `
+    // Financial Independence (skip if already FI — handled in the Today/Already-FI block above)
+    if (!alreadyFI) {
+        events.push({ age: fiAge, html: `
         <li class="timeline-item highlight">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
@@ -787,43 +803,45 @@ function calculateRetirement() {
                 <p>Portfolio reaches ${formatCurrency(fiPortfolio)}. ${fiDesc}</p>
             </div>
         </li>` });
+    }
 
-    // DB Pension (only if starts in the future)
-    if (includePension && pensionAge < 999 && pensionAge > age) {
-        const pBody = describeIncomeAt(pensionAge, expenses, benefits, isGCMode);
+    // DB Pension — show if future, but suppress if Employment Retirement milestone is at the same
+    // age (that milestone already shows the full income picture via describeIncomeAt)
+    const empRetShown = includeRetAge && Math.abs(plannedRetAge - fiAge) > 0.1;
+    if (includePension && pensionAge < 999 && pensionAge > age &&
+        !(empRetShown && Math.abs(pensionAge - plannedRetAge) < 0.1)) {
         events.push({ age: pensionAge, html: `
         <li class="timeline-item">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
                 <h4>DB Pension Starts (Age ${formatNumber(pensionAge)})</h4>
-                <p>${pBody}</p>
+                <p>${describeIncomeAt(pensionAge, expenses, benefits, isGCMode)}</p>
             </div>
         </li>` });
     }
 
-    // CPP (only if starts in the future)
+    // CPP milestone (only if CPP > 0 and starts in the future)
     if (includeCppOas && cppAmount > 0 && cppAge > age) {
-        const cppTitle = (oasAge === cppAge) ? `CPP &amp; OAS Start (Age ${formatNumber(cppAge)})` : `CPP Starts (Age ${formatNumber(cppAge)})`;
-        const cppBody = describeIncomeAt(cppAge, expenses, benefits, isGCMode);
+        const combinedWithOas = oasAmount > 0 && oasAge === cppAge;
+        const cppTitle = combinedWithOas ? `CPP &amp; OAS Start (Age ${formatNumber(cppAge)})` : `CPP Starts (Age ${formatNumber(cppAge)})`;
         events.push({ age: cppAge, html: `
         <li class="timeline-item timeline-cpp">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
                 <h4>${cppTitle}</h4>
-                <p>${cppBody}</p>
+                <p>${describeIncomeAt(cppAge, expenses, benefits, isGCMode)}</p>
             </div>
         </li>` });
     }
 
-    // OAS (only if different age from CPP and starts in the future)
-    if (includeCppOas && oasAmount > 0 && oasAge !== cppAge && oasAge > age) {
-        const oasBody = describeIncomeAt(oasAge, expenses, benefits, isGCMode);
+    // OAS milestone — show if OAS > 0, future, and NOT already covered in a combined CPP+OAS entry
+    if (includeCppOas && oasAmount > 0 && oasAge > age && !(cppAmount > 0 && oasAge === cppAge)) {
         events.push({ age: oasAge, html: `
         <li class="timeline-item timeline-oas">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
                 <h4>OAS Starts (Age ${formatNumber(oasAge)})</h4>
-                <p>${oasBody}</p>
+                <p>${describeIncomeAt(oasAge, expenses, benefits, isGCMode)}</p>
             </div>
         </li>` });
     }
@@ -923,17 +941,17 @@ function renderChart(data, empRetAge, fiAge, benefits, showBridgeEnd, dataNoPens
             }
             // FI line
             if (fiAge) drawLine(fiAge, '#10b981', 'FI', fiAge === empRetAge ? 15 : 30);
-            // DB Pension
-            if (pensionAge < 999 && (!fiAge || pensionAge > fiAge)) drawLine(pensionAge, '#8b5cf6', 'DB Pension', 45);
+            // DB Pension — always draw when set (it's a milestone whether before or after FI)
+            if (pensionAge < 999) drawLine(pensionAge, '#8b5cf6', 'DB Pension', 45);
             // Bridge end
             if (showBridgeEnd) drawLine(65, '#f59e0b', 'Bridge Ends', 60);
-            // CPP
-            if (cppAge < 999 && (!fiAge || cppAge > fiAge)) {
+            // CPP — always draw when set
+            if (cppAge < 999) {
                 const offset = showBridgeEnd ? 75 : 60;
                 drawLine(cppAge, '#06b6d4', 'CPP', offset);
             }
-            // OAS (only if different from CPP)
-            if (oasAge < 999 && oasAge !== cppAge && (!fiAge || oasAge > fiAge)) {
+            // OAS — always draw when set and at a different age from CPP
+            if (oasAge < 999 && oasAge !== cppAge) {
                 const offset = showBridgeEnd ? 90 : 75;
                 drawLine(oasAge, '#f97316', 'OAS', offset);
             }
@@ -1297,24 +1315,41 @@ function rptTimeline(d) {
         events.push({ age: plannedRetAge, isFI: false, title: 'Employment Retirement', body: `${prefix} ${incDesc}` });
     }
 
+    // FI description — same allSourcesActiveAtFI logic as main timeline
     const netExpAtFI = Math.max(0, expenses - getRetirementIncome(fiAge, benefits));
-    events.push({ age: fiAge, isFI: true, title: 'Financial Independence',
-        body: netExpAtFI === 0
-            ? `Income sources fully cover all ${formatCurrency(expenses)}/yr in expenses — no portfolio drawdown needed.`
-            : `Portfolio reaches ${formatCurrency(fiPortfolio)} — generating ${formatCurrency(fiPortfolio * swrDecimal)}/yr at ${formatNumber(swr)}% SWR to cover the ${formatCurrency(netExpAtFI)}/yr gap.` });
+    const rptTransAges = [];
+    if (pensionAge < 999) { rptTransAges.push(pensionAge); if (bridgeBenefit > 0 && pensionAge < 65) rptTransAges.push(65); }
+    if (cppAge < 999) rptTransAges.push(cppAge);
+    if (oasAge < 999) rptTransAges.push(oasAge);
+    const rptTerminalAge = rptTransAges.length > 0 ? Math.max(...rptTransAges) : 0;
+    const rptAllActive   = rptTerminalAge === 0 || fiAge >= rptTerminalAge;
+    const rptTerminalGap = Math.max(0, expenses -
+        (pensionAge < 999 ? lifetimePension : 0) - (cppAge < 999 ? cppAmount : 0) -
+        (oasAge < 999 ? oasAmount : 0) - (benefits.rentalIncome || 0));
+    let rptFiBody;
+    if (netExpAtFI === 0) {
+        rptFiBody = `Income sources fully cover all ${formatCurrency(expenses)}/yr at this age — no portfolio drawdown needed.`;
+    } else if (rptAllActive) {
+        rptFiBody = `Portfolio reaches ${formatCurrency(fiPortfolio)}, generating ${formatCurrency(fiPortfolio * swrDecimal)}/yr at ${formatNumber(swr)}% SWR to cover the ${formatCurrency(netExpAtFI)}/yr gap after income sources.`;
+    } else {
+        rptFiBody = rptTerminalGap <= 0
+            ? `Portfolio of ${formatCurrency(fiPortfolio)} bridges all expenses until income sources take over completely.`
+            : `Portfolio of ${formatCurrency(fiPortfolio)} bridges expenses to your income sources, then sustains a ${formatCurrency(rptTerminalGap)}/yr drawdown at ${formatNumber(swr)}% SWR.`;
+    }
+    events.push({ age: fiAge, isFI: true, title: 'Financial Independence', body: rptFiBody });
 
-    if (includePension && pensionAge < 999) {
+    if (includePension && pensionAge < 999 && pensionAge > age) {
         events.push({ age: pensionAge, isFI: false, title: 'DB Pension Starts',
             body: describeIncomeAt(pensionAge, expenses, benefits, isGCMode) });
     }
 
-    if (includeCppOas && cppAmount > 0) {
-        const combined = oasAge === cppAge && oasAmount > 0;
+    if (includeCppOas && cppAmount > 0 && cppAge > age) {
+        const combined = oasAmount > 0 && oasAge === cppAge;
         events.push({ age: cppAge, isFI: false, title: combined ? 'CPP & OAS Start' : 'CPP Starts',
             body: describeIncomeAt(cppAge, expenses, benefits, isGCMode) });
     }
 
-    if (includeCppOas && oasAmount > 0 && oasAge !== cppAge) {
+    if (includeCppOas && oasAmount > 0 && oasAge > age && !(cppAmount > 0 && oasAge === cppAge)) {
         events.push({ age: oasAge, isFI: false, title: 'OAS Starts',
             body: describeIncomeAt(oasAge, expenses, benefits, isGCMode) });
     }
