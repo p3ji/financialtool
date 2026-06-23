@@ -347,6 +347,43 @@ function updateAdjustmentNote(elementId, base, adjusted, startAge) {
     }
 }
 
+// Returns a complete description of all active income sources at a given age
+// and how much the portfolio must cover. Used by all timeline milestones.
+function describeIncomeAt(age, expenses, benefits, gcMode) {
+    const { pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0,
+            cppAge = 999, cppAmount = 0, oasAge = 999, oasAmount = 0, rentalIncome = 0 } = benefits;
+
+    const parts = [];
+    if (pensionAge < 999 && age >= pensionAge) {
+        if (gcMode && bridgeBenefit > 0) {
+            if (age < 65) {
+                parts.push(`DB Pension: ${formatCurrency(lifetimePension + bridgeBenefit)}/yr (${formatCurrency(lifetimePension)} lifetime + ${formatCurrency(bridgeBenefit)} bridge, ends at 65)`);
+            } else {
+                parts.push(`DB Pension: ${formatCurrency(lifetimePension)}/yr (lifetime only — bridge ended at 65)`);
+            }
+        } else {
+            parts.push(`DB Pension: ${formatCurrency(lifetimePension)}/yr`);
+        }
+    }
+    if (cppAge < 999 && age >= cppAge) parts.push(`CPP: ${formatCurrency(cppAmount)}/yr`);
+    if (oasAge < 999 && age >= oasAge) parts.push(`OAS: ${formatCurrency(oasAmount)}/yr`);
+    if (rentalIncome > 0)              parts.push(`Rental: ${formatCurrency(rentalIncome)}/yr`);
+
+    const totalIncome = getRetirementIncome(age, benefits);
+    const gap = Math.max(0, expenses - totalIncome);
+
+    if (parts.length === 0) {
+        return `No passive income active — portfolio covers all ${formatCurrency(expenses)}/yr in expenses.`;
+    }
+
+    const joined   = parts.join(' + ');
+    const totalStr = parts.length > 1 ? ` = ${formatCurrency(totalIncome)}/yr` : '';
+
+    return gap === 0
+        ? `${joined}${totalStr} — fully covers ${formatCurrency(expenses)}/yr in expenses.`
+        : `${joined}${totalStr}. Portfolio draws the remaining ${formatCurrency(gap)}/yr.`;
+}
+
 function calculateRetirement() {
 
     const includePension    = document.getElementById('chkIncludePension').checked;
@@ -637,14 +674,11 @@ function calculateRetirement() {
         const passiveAtRet  = getRetirementIncome(plannedRetAge, benefits);
         const gapAtRet      = Math.max(0, expenses - passiveAtRet);
         let retMsg;
+        const incomeDescAtRet = describeIncomeAt(plannedRetAge, expenses, benefits, isGCMode);
         if (isAlreadyFI) {
-            retMsg = gapAtRet === 0
-                ? `Already financially independent — stopping work is optional. Income sources fully cover ${formatCurrency(expenses)}/yr in expenses. Portfolio at ${formatCurrency(balAtEmpRet)}.`
-                : `Already financially independent — stopping work is optional. Portfolio draws ${formatCurrency(gapAtRet)}/yr to cover the remaining gap not met by income sources. Portfolio at ${formatCurrency(balAtEmpRet)}.`;
+            retMsg = `Already financially independent — stopping work is optional. Portfolio at ${formatCurrency(balAtEmpRet)}. ${incomeDescAtRet}`;
         } else {
-            retMsg = gapAtRet === 0
-                ? `Stop working. Portfolio at ${formatCurrency(balAtEmpRet)}. Income sources already cover all expenses — no drawdown required.`
-                : `Stop working. Portfolio at ${formatCurrency(balAtEmpRet)}. Drawing ${formatCurrency(gapAtRet)}/yr from portfolio to cover the shortfall until FI.`;
+            retMsg = `Stop working. Portfolio at ${formatCurrency(balAtEmpRet)}. ${incomeDescAtRet}`;
         }
         events.push({ age: plannedRetAge, html: `
         <li class="timeline-item timeline-emp-ret">
@@ -668,11 +702,7 @@ function calculateRetirement() {
 
     // DB Pension
     if (includePension && pensionAge < 999) {
-        const pensionStart  = lifetimePension + bridgeBenefit;
-        const remainingExp  = Math.max(0, expenses - pensionStart);
-        const pBody = (isGCMode && bridgeBenefit > 0)
-            ? `Pension provides ${formatCurrency(pensionStart)}/yr (${formatCurrency(lifetimePension)} lifetime + ${formatCurrency(bridgeBenefit)} bridge). Portfolio covers ${formatCurrency(remainingExp)}/yr. Bridge ends at 65.`
-            : `Pension provides ${formatCurrency(pensionStart)}/yr. Portfolio covers ${formatCurrency(remainingExp)}/yr.`;
+        const pBody = describeIncomeAt(pensionAge, expenses, benefits, isGCMode);
         events.push({ age: pensionAge, html: `
         <li class="timeline-item">
             <div class="timeline-marker"></div>
@@ -685,16 +715,13 @@ function calculateRetirement() {
 
     // CPP
     if (includeCppOas && cppAmount > 0) {
-        const incomeAtCpp = getRetirementIncome(cppAge, benefits);
-        const gapAtCpp    = Math.max(0, expenses - incomeAtCpp);
-        const cppBody = (oasAge === cppAge)
-            ? `CPP (${formatCurrency(cppAmount)}/yr) &amp; OAS (${formatCurrency(oasAmount)}/yr) start. Portfolio covers ${formatCurrency(gapAtCpp)}/yr shortfall.`
-            : `CPP starts (${formatCurrency(cppAmount)}/yr). Portfolio covers ${formatCurrency(gapAtCpp)}/yr shortfall.`;
+        const cppTitle = (oasAge === cppAge) ? `CPP &amp; OAS Start (Age ${formatNumber(cppAge)})` : `CPP Starts (Age ${formatNumber(cppAge)})`;
+        const cppBody = describeIncomeAt(cppAge, expenses, benefits, isGCMode);
         events.push({ age: cppAge, html: `
         <li class="timeline-item timeline-cpp">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
-                <h4>CPP Starts (Age ${formatNumber(cppAge)})</h4>
+                <h4>${cppTitle}</h4>
                 <p>${cppBody}</p>
             </div>
         </li>` });
@@ -702,14 +729,13 @@ function calculateRetirement() {
 
     // OAS (only if different age from CPP)
     if (includeCppOas && oasAmount > 0 && oasAge !== cppAge) {
-        const incomeAtOas = getRetirementIncome(oasAge, benefits);
-        const gapAtOas    = Math.max(0, expenses - incomeAtOas);
+        const oasBody = describeIncomeAt(oasAge, expenses, benefits, isGCMode);
         events.push({ age: oasAge, html: `
         <li class="timeline-item timeline-oas">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
                 <h4>OAS Starts (Age ${formatNumber(oasAge)})</h4>
-                <p>OAS starts (${formatCurrency(oasAmount)}/yr). Portfolio covers ${formatCurrency(gapAtOas)}/yr shortfall.</p>
+                <p>${oasBody}</p>
             </div>
         </li>` });
     }
@@ -1175,20 +1201,12 @@ function rptTimeline(d) {
     events.push({ age, isFI: false, title: 'Today', body: `Age ${formatNumber(age)}.${balNote} Working — ${formatCurrency(income)}/yr income, ${formatCurrency(expenses)}/yr expenses.` });
 
     if (includeRetAge && Math.abs(plannedRetAge - fiAge) > 0.1) {
-        const isAfterFI   = plannedRetAge > fiAge;
-        const passiveAtRet = getRetirementIncome(plannedRetAge, benefits);
-        const gap          = Math.max(0, expenses - passiveAtRet);
-        let body;
-        if (isAfterFI) {
-            body = gap === 0
-                ? `Already financially independent — stopping work is optional. Income sources fully cover ${formatCurrency(expenses)}/yr. Portfolio at ${formatCurrency(balAtEmpRet)}.`
-                : `Already financially independent. Portfolio draws ${formatCurrency(gap)}/yr for remaining gap. Portfolio at ${formatCurrency(balAtEmpRet)}.`;
-        } else {
-            body = gap === 0
-                ? `Stop working. Income sources already cover all expenses — no drawdown required. Portfolio at ${formatCurrency(balAtEmpRet)}.`
-                : `Stop working. Drawing ${formatCurrency(gap)}/yr from portfolio to cover shortfall. Portfolio at ${formatCurrency(balAtEmpRet)}.`;
-        }
-        events.push({ age: plannedRetAge, isFI: false, title: 'Employment Retirement', body });
+        const isAfterFI = plannedRetAge > fiAge;
+        const incDesc   = describeIncomeAt(plannedRetAge, expenses, benefits, isGCMode);
+        const prefix    = isAfterFI
+            ? `Already financially independent — stopping work is optional. Portfolio at ${formatCurrency(balAtEmpRet)}.`
+            : `Stop working. Portfolio at ${formatCurrency(balAtEmpRet)}.`;
+        events.push({ age: plannedRetAge, isFI: false, title: 'Employment Retirement', body: `${prefix} ${incDesc}` });
     }
 
     const netExpAtFI = Math.max(0, expenses - getRetirementIncome(fiAge, benefits));
@@ -1198,28 +1216,19 @@ function rptTimeline(d) {
             : `Portfolio reaches ${formatCurrency(fiPortfolio)} — generating ${formatCurrency(fiPortfolio * swrDecimal)}/yr at ${formatNumber(swr)}% SWR to cover the ${formatCurrency(netExpAtFI)}/yr gap.` });
 
     if (includePension && pensionAge < 999) {
-        const total = lifetimePension + bridgeBenefit;
-        const gap   = Math.max(0, expenses - total);
         events.push({ age: pensionAge, isFI: false, title: 'DB Pension Starts',
-            body: (isGCMode && bridgeBenefit > 0)
-                ? `${formatCurrency(lifetimePension)}/yr lifetime + ${formatCurrency(bridgeBenefit)}/yr bridge = ${formatCurrency(total)}/yr. Portfolio covers ${formatCurrency(gap)}/yr gap. Bridge ends at 65.`
-                : `Pension begins at ${formatCurrency(total)}/yr. Portfolio covers ${formatCurrency(gap)}/yr gap.` });
+            body: describeIncomeAt(pensionAge, expenses, benefits, isGCMode) });
     }
 
     if (includeCppOas && cppAmount > 0) {
-        const combined   = oasAge === cppAge && oasAmount > 0;
-        const incAtCpp   = getRetirementIncome(cppAge, benefits);
-        const gap        = Math.max(0, expenses - incAtCpp);
+        const combined = oasAge === cppAge && oasAmount > 0;
         events.push({ age: cppAge, isFI: false, title: combined ? 'CPP & OAS Start' : 'CPP Starts',
-            body: combined
-                ? `CPP (${formatCurrency(cppAmount)}/yr) and OAS (${formatCurrency(oasAmount)}/yr) both begin. Portfolio covers ${formatCurrency(gap)}/yr shortfall.`
-                : `CPP begins at ${formatCurrency(cppAmount)}/yr. Portfolio covers ${formatCurrency(gap)}/yr shortfall.` });
+            body: describeIncomeAt(cppAge, expenses, benefits, isGCMode) });
     }
 
     if (includeCppOas && oasAmount > 0 && oasAge !== cppAge) {
-        const incAtOas = getRetirementIncome(oasAge, benefits);
-        const gap      = Math.max(0, expenses - incAtOas);
-        events.push({ age: oasAge, isFI: false, title: 'OAS Starts', body: `OAS begins at ${formatCurrency(oasAmount)}/yr. Portfolio covers ${formatCurrency(gap)}/yr shortfall.` });
+        events.push({ age: oasAge, isFI: false, title: 'OAS Starts',
+            body: describeIncomeAt(oasAge, expenses, benefits, isGCMode) });
     }
 
     events.sort((a, b) => a.age - b.age);
