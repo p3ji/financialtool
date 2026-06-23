@@ -374,7 +374,7 @@ function describeIncomeAt(age, expenses, benefits, gcMode) {
     const gap = Math.max(0, expenses - totalIncome);
 
     if (parts.length === 0) {
-        return `No passive income active — portfolio covers all ${formatCurrency(expenses)}/yr in expenses.`;
+        return `No passive income active — portfolio draws down to fund all ${formatCurrency(expenses)}/yr in expenses.`;
     }
 
     const joined   = parts.join(' + ');
@@ -660,6 +660,7 @@ function calculateRetirement() {
         partialEvents.sort((a, b) => a.age - b.age);
         timelineList.innerHTML = partialEvents.map(e => e.html).join('');
         timelinePanel.style.display = 'block';
+        if (typeof updateDemographicBenchmarks === 'function') updateDemographicBenchmarks();
         renderReport({ age, income, expenses, savings, savingsRate, balance, rentalIncome,
             roiAnnual, swr, swrDecimal, includeRetAge, plannedRetAge,
             includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
