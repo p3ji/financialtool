@@ -81,6 +81,12 @@
         </header>
 
         <main class="methodology-content">
+
+            <div class="disclaimer-box">
+                <p><strong>Not Financial Advice.</strong> This page and the associated calculator are for personal financial scenario planning and educational purposes only. They do not constitute financial, tax, investment, or legal advice. Always consult a qualified financial advisor, Certified Financial Planner (CFP), or tax professional before making any financial decisions.</p>
+                <p><strong>Privacy.</strong> All calculations run entirely within your browser. No data you enter is collected, stored, or transmitted.</p>
+            </div>
+
             <h2>Overview</h2>
             <p>
                 Standard "FIRE" (Financial Independence, Retire Early) calculators operate on a single assumption: your investment portfolio must cover your expenses forever. 
@@ -144,7 +150,7 @@
 
             <h3>1. Income Benchmarks</h3>
             <p>
-                Income data is sourced from the <strong>Canadian Income Survey (CIS, 2024)</strong>, specifically <strong>Table 11-10-0190-01</strong> (formerly CANSIM 206-0011).
+                Income data is sourced from the <strong>Canadian Income Survey (CIS, 2024)</strong>, specifically <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1110019001" target="_blank" rel="noopener" style="color: var(--accent-color);">Table 11-10-0190-01</a> (formerly CANSIM 206-0011).
             </p>
             <ul>
                 <li><strong>Unit of Analysis:</strong> "Economic Families" (two or more related people living in the same dwelling) and "Unattached Individuals" (persons not in an economic family).</li>
@@ -160,9 +166,9 @@
                 <li><strong>Concept:</strong> We use <strong>Total Current Consumption</strong>. This metric represents expenditures on goods and services (food, shelter, utilities, transportation, healthcare, etc.). It strictly excludes personal income taxes, pension contributions, and insurance premiums, ensuring it aligns with the "Annual Expenses" input of the calculator without double-counting savings.</li>
                 <li><strong>Data Granularity and Limitations:</strong> Unlike income, Statistics Canada does not publish spending data cross-tabulated by province, age, and household type together. Instead, these dimensions are published in separate tables:
                     <ul>
-                        <li><strong>Household Type (Table 11-10-0244-01):</strong> Canada-wide average spending broken down by household composition. Because family structure is the primary driver of spending, this is used as the primary benchmark.</li>
-                        <li><strong>Geography (Table 11-10-0222-01):</strong> Average spending by province. This provides geographic context (e.g., higher average costs in Alberta/Ontario versus Atlantic Canada).</li>
-                        <li><strong>Age (Table 11-10-0227-01):</strong> Average Canada-wide spending by the age of the reference person. This shows how spending naturally contracts or expands at different life stages.</li>
+                        <li><strong>Household Type (<a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1110024401" target="_blank" rel="noopener" style="color: var(--accent-color);">Table 11-10-0244-01</a>):</strong> Canada-wide average spending broken down by household composition. Because family structure is the primary driver of spending, this is used as the primary benchmark.</li>
+                        <li><strong>Geography (<a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1110022201" target="_blank" rel="noopener" style="color: var(--accent-color);">Table 11-10-0222-01</a>):</strong> Average spending by province. This provides geographic context (e.g., higher average costs in Alberta/Ontario versus Atlantic Canada).</li>
+                        <li><strong>Age (<a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1110022701" target="_blank" rel="noopener" style="color: var(--accent-color);">Table 11-10-0227-01</a>):</strong> Average Canada-wide spending by the age of the reference person. This shows how spending naturally contracts or expands at different life stages.</li>
                     </ul>
                 </li>
             </ul>

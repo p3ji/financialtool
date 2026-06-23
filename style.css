@@ -1019,3 +1019,50 @@ details[open] .assumptions-summary::before {
     color: #60a5fa !important;
     border: 1px solid rgba(59, 130, 246, 0.2) !important;
 }
+
+/* Site Footer */
+.site-footer {
+    border-top: 1px solid var(--panel-border);
+    padding: 2rem 2rem 2.5rem;
+    margin-top: 2rem;
+    background: rgba(11, 15, 25, 0.6);
+}
+
+.site-footer-content {
+    max-width: 900px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.site-footer p {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.65;
+    margin-bottom: 0.6rem;
+}
+
+.site-footer p:last-child {
+    margin-bottom: 0;
+}
+
+.site-footer strong {
+    color: #cbd5e1;
+}
+
+/* Methodology disclaimer box */
+.disclaimer-box {
+    background: rgba(59, 130, 246, 0.06);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.disclaimer-box p {
+    margin-bottom: 0.5rem;
+    font-size: 0.88rem;
+}
+
+.disclaimer-box p:last-child {
+    margin-bottom: 0;
+}

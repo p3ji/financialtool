@@ -422,6 +422,24 @@ function calculateRetirement() {
     results.annualSavings.innerText = formatCurrency(savings);
     results.savingsRate.innerText   = formatNumber(savingsRate) + '%';
 
+    // Require minimum meaningful inputs before running simulation
+    if (age <= 0 || expenses <= 0) {
+        results.yearsToFI.innerText   = '--';
+        results.fiAge.innerText       = '--';
+        results.fiPortfolio.innerText = '--';
+        chartStatus.innerText    = 'Enter age & expenses to calculate';
+        chartStatus.className    = 'badge';
+        timelinePanel.style.display = 'none';
+        const _btnTbl  = document.getElementById('btnToggleTable');
+        const _tblCont = document.getElementById('detailedTableContainer');
+        const _split   = document.getElementById('targetSplitRow');
+        if (_btnTbl)  _btnTbl.style.display  = 'none';
+        if (_tblCont) _tblCont.style.display = 'none';
+        if (_split)   _split.style.display   = 'none';
+        if (retirementChartInstance) { retirementChartInstance.destroy(); retirementChartInstance = null; }
+        return;
+    }
+
     const maxMonths = (100 - age) * 12;
     // Month at which employment income stops
     const monthsToEmpStop = Math.max(0, Math.round((plannedRetAge - age) * 12));
@@ -609,12 +627,25 @@ function calculateRetirement() {
 
     // Employment Retirement (only if user added it and it differs meaningfully from FI)
     if (includeRetAge && Math.abs(plannedRetAge - fiAge) > 0.1) {
+        const isAlreadyFI   = plannedRetAge > fiAge;
+        const passiveAtRet  = getRetirementIncome(plannedRetAge, benefits);
+        const gapAtRet      = Math.max(0, expenses - passiveAtRet);
+        let retMsg;
+        if (isAlreadyFI) {
+            retMsg = gapAtRet === 0
+                ? `Already financially independent — stopping work is optional. Income sources fully cover ${formatCurrency(expenses)}/yr in expenses. Portfolio at ${formatCurrency(balAtEmpRet)}.`
+                : `Already financially independent — stopping work is optional. Portfolio draws ${formatCurrency(gapAtRet)}/yr to cover the remaining gap not met by income sources. Portfolio at ${formatCurrency(balAtEmpRet)}.`;
+        } else {
+            retMsg = gapAtRet === 0
+                ? `Stop working. Portfolio at ${formatCurrency(balAtEmpRet)}. Income sources already cover all expenses — no drawdown required.`
+                : `Stop working. Portfolio at ${formatCurrency(balAtEmpRet)}. Drawing ${formatCurrency(gapAtRet)}/yr from portfolio to cover the shortfall until FI.`;
+        }
         events.push({ age: plannedRetAge, html: `
         <li class="timeline-item timeline-emp-ret">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
                 <h4>Employment Retirement (Age ${formatNumber(plannedRetAge)})</h4>
-                <p>Stop working. Portfolio at ${formatCurrency(balAtEmpRet)}. Drawing down until FI or income sources cover expenses.</p>
+                <p>${retMsg}</p>
             </div>
         </li>` });
     }
