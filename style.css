@@ -1049,6 +1049,228 @@ details[open] .assumptions-summary::before {
     color: #cbd5e1;
 }
 
+/* ============================================================
+   Report Tab
+   ============================================================ */
+
+.report-empty-state {
+    text-align: center;
+    padding: 5rem 2rem;
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+.report-doc {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 2rem;
+}
+
+.report-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 2rem 0 1.5rem;
+}
+
+.report-print-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--panel-border);
+    color: var(--text-muted);
+    padding: 0.45rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-family: var(--font-main);
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+.report-print-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-main); }
+
+.report-section {
+    background: var(--panel-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 2rem 2.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.report-section-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent-color);
+    margin-bottom: 0.35rem;
+}
+
+.report-section h2 {
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 1.25rem;
+}
+
+.report-narrative {
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin-bottom: 0.75rem;
+    font-size: 0.92rem;
+}
+.report-narrative:last-child { margin-bottom: 0; }
+.report-narrative strong { color: var(--text-main); }
+
+/* FI hero block */
+.report-fi-hero {
+    background: linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(139,92,246,0.08) 100%);
+    border: 1px solid rgba(59,130,246,0.2);
+    border-radius: 12px;
+    padding: 1.75rem 2rem;
+    margin-bottom: 1.25rem;
+    text-align: center;
+}
+.report-fi-hero .fi-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 0.4rem; }
+.report-fi-hero .fi-age {
+    font-family: var(--font-heading);
+    font-size: 3.2rem;
+    font-weight: 700;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1.1;
+}
+.report-fi-hero .fi-sub { font-size: 0.9rem; color: var(--text-muted); margin-top: 0.5rem; }
+
+/* Pension value callout */
+.report-pension-callout {
+    background: rgba(16,185,129,0.07);
+    border: 1px solid rgba(16,185,129,0.2);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-top: 0.5rem;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.65;
+}
+.report-pension-callout strong { color: var(--success-color); }
+
+/* Income table */
+.report-income-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    margin-bottom: 1rem;
+}
+.report-income-table th {
+    text-align: left;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--panel-border);
+}
+.report-income-table td {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    color: var(--text-muted);
+}
+.report-income-table td:last-child { text-align: right; font-weight: 500; color: var(--text-main); }
+.report-income-table tr.portfolio-row td { color: #60a5fa; }
+.report-income-table tr.portfolio-row td:last-child { color: #60a5fa; }
+.report-income-table tr.pending-row td { opacity: 0.5; }
+.report-income-table tr.income-total td {
+    border-top: 1px solid var(--panel-border);
+    border-bottom: none;
+    padding-top: 0.8rem;
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+/* Timeline */
+.report-timeline { list-style: none; padding: 0; margin: 0; }
+.report-timeline-item {
+    display: flex;
+    gap: 1.25rem;
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--panel-border);
+}
+.report-timeline-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.report-timeline-age {
+    flex-shrink: 0;
+    width: 50px;
+    text-align: center;
+    padding-top: 0.1rem;
+}
+.report-timeline-age .age-num {
+    font-family: var(--font-heading);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    display: block;
+}
+.report-timeline-age .age-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.report-timeline-item.fi-item .age-num { color: var(--success-color); }
+.report-timeline-body h4 { font-size: 0.92rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.3rem; }
+.report-timeline-body p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; }
+
+/* StatCan benchmark section */
+.report-selectors-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.report-select-group { flex: 1; min-width: 180px; }
+.report-select-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.4rem; }
+
+.report-benchmark-block { margin-bottom: 2rem; }
+.report-benchmark-block:last-child { margin-bottom: 0; }
+.report-benchmark-block h3 { font-size: 1rem; font-weight: 600; color: #ffffff; margin-bottom: 0.4rem; }
+
+.report-benchmark-tag {
+    display: inline-block;
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 0.18rem 0.55rem;
+    border-radius: 4px;
+    margin-bottom: 0.85rem;
+}
+.report-benchmark-tag.two-way { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
+.report-benchmark-tag.three-way { background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.25); }
+
+.report-compare-row { display: flex; gap: 0.65rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.report-compare-item {
+    flex: 1;
+    min-width: 120px;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 0.75rem 0.9rem;
+}
+.report-compare-item.user-item { border-color: rgba(59,130,246,0.3); background: rgba(59,130,246,0.06); }
+.compare-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 0.3rem; }
+.report-compare-item.user-item .compare-label { color: #60a5fa; }
+.compare-val { font-size: 1.05rem; font-weight: 600; color: var(--text-main); }
+
+.report-explanation {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.65;
+    padding: 0.85rem 1rem;
+    background: rgba(0,0,0,0.15);
+    border-left: 3px solid var(--panel-border);
+    border-radius: 0 6px 6px 0;
+}
+.report-explanation strong { color: var(--text-main); }
+
+@media print {
+    .top-nav, .report-header-row, .app-background, footer, #comparisonPanel, .dashboard { display: none !important; }
+    #reportPanel { display: block !important; }
+    .report-section { break-inside: avoid; page-break-inside: avoid; border: 1px solid #ccc; }
+    body { background: white; color: black; }
+}
+
 /* Methodology disclaimer box */
 .disclaimer-box {
     background: rgba(59, 130, 246, 0.06);

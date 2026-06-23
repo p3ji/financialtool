@@ -558,6 +558,12 @@ function calculateRetirement() {
         if (detailedTableContainer) detailedTableContainer.style.display = 'none';
         if (targetSplitRow) targetSplitRow.style.display = 'none';
         renderChart(main.simData, plannedRetAge, null, benefits, isGCMode && bridgeBenefit > 0, noPen ? noPen.simData : []);
+        renderReport({ age, income, expenses, savings, savingsRate, balance, rentalIncome,
+            roiAnnual, swr, swrDecimal, includeRetAge, plannedRetAge,
+            includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
+            includeCppOas, cppAmount, cppAge, oasAmount, oasAge,
+            fiAge: null, yearsToFI: null, fiPortfolio: null, fiPortfolioNoPension: null,
+            balAtEmpRet: 0, benefits });
         return;
     }
 
@@ -716,6 +722,13 @@ function calculateRetirement() {
     renderDetailedTable(main.yearlyData, roiAnnual);
 
     if (typeof updateDemographicBenchmarks === 'function') updateDemographicBenchmarks();
+
+    renderReport({ age, income, expenses, savings, savingsRate, balance, rentalIncome,
+        roiAnnual, swr, swrDecimal, includeRetAge, plannedRetAge,
+        includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
+        includeCppOas, cppAmount, cppAge, oasAmount, oasAge,
+        fiAge, yearsToFI, fiPortfolio, fiPortfolioNoPension,
+        balAtEmpRet, benefits });
 }
 
 function renderDetailedTable(yearlyData, roi) {
@@ -957,3 +970,438 @@ function updateDemographicBenchmarks() {
         </ul>
     `;
 }
+
+// ============================================================
+// Report Tab
+// ============================================================
+
+let lastReportData = null;
+
+function renderReport(data) {
+    lastReportData = data;
+    const panel = document.getElementById('reportPanel');
+    if (!panel) return;
+    const province  = document.getElementById('demoProvince')?.value  || 'Canada';
+    const household = document.getElementById('demoHousehold')?.value || 'CoupleNoChildren';
+    panel.innerHTML = buildReportHTML(data, province, household);
+    wireReportSelectors();
+}
+
+function buildReportHTML(data, province, household) {
+    const { fiAge } = data;
+    const now = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+    return `
+        <div class="report-doc">
+            <div class="report-header-row">
+                <div>
+                    <div class="report-section-label">Retirement Projection Report</div>
+                    <div style="color:var(--text-muted);font-size:0.82rem;">Generated ${now}</div>
+                </div>
+                <button class="report-print-btn" onclick="window.print()">Print / Save PDF</button>
+            </div>
+            ${rptSnapshot(data)}
+            ${rptAnswer(data)}
+            ${fiAge ? rptIncome(data) : ''}
+            ${rptTimeline(data)}
+            <div id="reportBenchmarkOuter">${rptBenchmarks(data, province, household)}</div>
+            ${rptAssumptions(data)}
+        </div>
+    `;
+}
+
+function wireReportSelectors() {
+    const rp = document.getElementById('reportDemoProvince');
+    const rh = document.getElementById('reportDemoHousehold');
+    if (!rp || !rh) return;
+    function onChange() {
+        const mp = document.getElementById('demoProvince');
+        const mh = document.getElementById('demoHousehold');
+        if (mp) mp.value = rp.value;
+        if (mh) mh.value = rh.value;
+        updateDemographicBenchmarks();
+        const outer = document.getElementById('reportBenchmarkOuter');
+        if (outer && lastReportData) {
+            outer.innerHTML = rptBenchmarks(lastReportData, rp.value, rh.value);
+            wireReportSelectors();
+        }
+    }
+    rp.addEventListener('change', onChange);
+    rh.addEventListener('change', onChange);
+}
+
+function rptSnapshot(d) {
+    const { age, income, expenses, savings, savingsRate, balance,
+            includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
+            includeCppOas, cppAmount, cppAge, oasAmount, oasAge, rentalIncome } = d;
+
+    const incText = income > 0
+        ? `earning <strong>${formatCurrency(income)}/yr</strong> after tax`
+        : 'no employment income entered';
+    const savText = income > 0 && expenses > 0
+        ? ` Savings rate: <strong>${formatNumber(savingsRate)}%</strong> (${formatCurrency(savings)}/yr).`
+        : '';
+    const balText = balance > 0
+        ? `Current portfolio: <strong>${formatCurrency(balance)}</strong>.`
+        : 'No current portfolio balance entered.';
+
+    const sources = [];
+    if (includePension) {
+        const total = lifetimePension + bridgeBenefit;
+        const label = isGCMode ? 'MyGCPension' : 'DB Pension';
+        sources.push(`${label}: <strong>${formatCurrency(total)}/yr</strong> at age ${formatNumber(pensionAge)}`
+            + (isGCMode && bridgeBenefit > 0 ? ` (${formatCurrency(bridgeBenefit)} bridge ends at 65)` : ''));
+    }
+    if (includeCppOas && cppAmount > 0) sources.push(`CPP: <strong>${formatCurrency(cppAmount)}/yr</strong> at age ${cppAge}`);
+    if (includeCppOas && oasAmount > 0) sources.push(`OAS: <strong>${formatCurrency(oasAmount)}/yr</strong> at age ${oasAge}`);
+    if (rentalIncome > 0) sources.push(`Rental income: <strong>${formatCurrency(rentalIncome)}/yr</strong>`);
+
+    return `
+        <div class="report-section">
+            <div class="report-section-label">Section 1</div>
+            <h2>Your Financial Snapshot</h2>
+            <p class="report-narrative">Age <strong>${formatNumber(age)}</strong> — ${incText}, with <strong>${formatCurrency(expenses)}/yr</strong> in annual expenses.${savText}</p>
+            <p class="report-narrative">${balText}</p>
+            ${sources.length ? `<p class="report-narrative">Retirement income sources: ${sources.join(' &nbsp;·&nbsp; ')}.</p>` : ''}
+        </div>`;
+}
+
+function rptAnswer(d) {
+    const { fiAge, yearsToFI, fiPortfolio, fiPortfolioNoPension,
+            expenses, includePension, swr, swrDecimal, benefits } = d;
+
+    if (!fiAge) return `
+        <div class="report-section">
+            <div class="report-section-label">Section 2</div>
+            <h2>Financial Independence</h2>
+            <p class="report-narrative">Financial independence could not be calculated with the current inputs. Ensure you have entered your annual expenses and consider adding a portfolio balance or retirement income sources.</p>
+        </div>`;
+
+    const fiYear = new Date().getFullYear() + Math.round(yearsToFI);
+    const netExp = Math.max(0, expenses - getRetirementIncome(fiAge, benefits));
+    const portDesc = netExp === 0
+        ? `Your passive income sources fully cover your <strong>${formatCurrency(expenses)}/yr</strong> in expenses — no portfolio drawdown is needed.`
+        : `Your portfolio needs to reach <strong>${formatCurrency(fiPortfolio)}</strong>, which at a <strong>${formatNumber(swr)}% safe withdrawal rate</strong> generates <strong>${formatCurrency(fiPortfolio * swrDecimal)}/yr</strong> — covering the ${formatCurrency(netExp)}/yr not met by other income sources.`;
+
+    const pensionBlock = includePension && fiPortfolioNoPension !== null && fiPortfolioNoPension > fiPortfolio
+        ? `<div class="report-pension-callout">
+                <strong>Your DB pension reduces the portfolio you need by ${formatCurrency(fiPortfolioNoPension - fiPortfolio)}</strong> — from ${formatCurrency(fiPortfolioNoPension)} (without pension) down to ${formatCurrency(fiPortfolio)} (with pension). That difference is built into your compensation as a public servant.
+           </div>`
+        : '';
+
+    return `
+        <div class="report-section">
+            <div class="report-section-label">Section 2</div>
+            <h2>Financial Independence</h2>
+            <div class="report-fi-hero">
+                <div class="fi-label">You can reach Financial Independence at age</div>
+                <div class="fi-age">${formatNumber(fiAge)}</div>
+                <div class="fi-sub">${formatNumber(yearsToFI)} years from now &nbsp;·&nbsp; ~${fiYear}</div>
+            </div>
+            <p class="report-narrative"><strong>What does this mean?</strong> Financial independence means your investment portfolio — combined with any pension, CPP, OAS, or other passive income — generates enough to cover your living expenses indefinitely without needing employment income.</p>
+            <p class="report-narrative">${portDesc}</p>
+            ${pensionBlock}
+        </div>`;
+}
+
+function rptIncome(d) {
+    const { fiAge, expenses, includePension, isGCMode, pensionAge, lifetimePension,
+            bridgeBenefit, includeCppOas, cppAmount, cppAge, oasAmount, oasAge,
+            rentalIncome, swr, fiPortfolio } = d;
+
+    const rows = [];
+    if (includePension && pensionAge < 999) {
+        if (fiAge >= pensionAge) {
+            rows.push({ label: isGCMode ? 'Lifetime Pension' : 'DB Pension', when: `Starts age ${formatNumber(pensionAge)}`, amount: lifetimePension });
+            if (isGCMode && bridgeBenefit > 0 && fiAge < 65)
+                rows.push({ label: 'Bridge Benefit', when: 'Ends at 65', amount: bridgeBenefit });
+        } else {
+            rows.push({ label: isGCMode ? 'Lifetime Pension' : 'DB Pension', when: `Age ${formatNumber(pensionAge)} — after FI`, amount: 0, pending: true });
+        }
+    }
+    if (includeCppOas && cppAmount > 0) {
+        if (fiAge >= cppAge) rows.push({ label: 'CPP', when: `Age ${cppAge}`, amount: cppAmount });
+        else                 rows.push({ label: 'CPP', when: `Age ${cppAge} — after FI`, amount: 0, pending: true });
+    }
+    if (includeCppOas && oasAmount > 0) {
+        if (fiAge >= oasAge) rows.push({ label: 'OAS', when: `Age ${oasAge}`, amount: oasAmount });
+        else                 rows.push({ label: 'OAS', when: `Age ${oasAge} — after FI`, amount: 0, pending: true });
+    }
+    if (rentalIncome > 0) rows.push({ label: 'Rental Income', when: 'Ongoing', amount: rentalIncome });
+
+    const totalPassive = rows.filter(r => !r.pending).reduce((s, r) => s + r.amount, 0);
+    const draw = Math.max(0, expenses - totalPassive);
+
+    const rowsHTML = rows.map(r => `
+        <tr${r.pending ? ' class="pending-row"' : ''}>
+            <td>${r.label}</td>
+            <td style="color:var(--text-muted);font-size:0.83rem;">${r.when}</td>
+            <td>${r.pending ? '<em style="font-size:0.8rem;color:var(--text-muted);">not yet active</em>' : formatCurrency(r.amount) + '/yr'}</td>
+        </tr>`).join('');
+
+    const portRow = draw > 0
+        ? `<tr class="portfolio-row"><td>Portfolio withdrawal (${formatNumber(swr)}% SWR)</td><td style="color:var(--text-muted);font-size:0.83rem;">From ${formatCurrency(fiPortfolio)} portfolio at FI</td><td>${formatCurrency(draw)}/yr</td></tr>`
+        : `<tr class="portfolio-row"><td colspan="2" style="color:var(--text-muted);">Portfolio — no drawdown needed</td><td>$0/yr</td></tr>`;
+
+    const coverNote = draw === 0
+        ? `At age ${formatNumber(fiAge)}, your passive income fully covers your ${formatCurrency(expenses)}/yr in expenses — no portfolio withdrawals required.`
+        : `At age ${formatNumber(fiAge)}, the portfolio covers the ${formatCurrency(draw)}/yr gap between your expenses and your active income sources.`;
+
+    return `
+        <div class="report-section">
+            <div class="report-section-label">Section 3</div>
+            <h2>Retirement Income at FI (Age ${formatNumber(fiAge)})</h2>
+            <table class="report-income-table">
+                <thead><tr><th>Income Source</th><th>Timing</th><th style="text-align:right;">Annual Amount</th></tr></thead>
+                <tbody>
+                    ${rowsHTML}
+                    ${portRow}
+                    <tr class="income-total"><td colspan="2">Your Annual Expenses</td><td>${formatCurrency(expenses)}/yr</td></tr>
+                </tbody>
+            </table>
+            <p class="report-narrative">${coverNote}</p>
+        </div>`;
+}
+
+function rptTimeline(d) {
+    const { age, income, expenses, balance, fiAge, fiPortfolio, swrDecimal, swr,
+            includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
+            includeCppOas, cppAmount, cppAge, oasAmount, oasAge,
+            includeRetAge, plannedRetAge, balAtEmpRet, benefits } = d;
+
+    if (!fiAge) return '';
+
+    const events = [];
+    const balNote = balance > 0 ? ` Portfolio: ${formatCurrency(balance)}.` : '';
+    events.push({ age, isFI: false, title: 'Today', body: `Age ${formatNumber(age)}.${balNote} Working — ${formatCurrency(income)}/yr income, ${formatCurrency(expenses)}/yr expenses.` });
+
+    if (includeRetAge && Math.abs(plannedRetAge - fiAge) > 0.1) {
+        const isAfterFI   = plannedRetAge > fiAge;
+        const passiveAtRet = getRetirementIncome(plannedRetAge, benefits);
+        const gap          = Math.max(0, expenses - passiveAtRet);
+        let body;
+        if (isAfterFI) {
+            body = gap === 0
+                ? `Already financially independent — stopping work is optional. Income sources fully cover ${formatCurrency(expenses)}/yr. Portfolio at ${formatCurrency(balAtEmpRet)}.`
+                : `Already financially independent. Portfolio draws ${formatCurrency(gap)}/yr for remaining gap. Portfolio at ${formatCurrency(balAtEmpRet)}.`;
+        } else {
+            body = gap === 0
+                ? `Stop working. Income sources already cover all expenses — no drawdown required. Portfolio at ${formatCurrency(balAtEmpRet)}.`
+                : `Stop working. Drawing ${formatCurrency(gap)}/yr from portfolio to cover shortfall. Portfolio at ${formatCurrency(balAtEmpRet)}.`;
+        }
+        events.push({ age: plannedRetAge, isFI: false, title: 'Employment Retirement', body });
+    }
+
+    const netExpAtFI = Math.max(0, expenses - getRetirementIncome(fiAge, benefits));
+    events.push({ age: fiAge, isFI: true, title: 'Financial Independence',
+        body: netExpAtFI === 0
+            ? `Income sources fully cover all ${formatCurrency(expenses)}/yr in expenses — no portfolio drawdown needed.`
+            : `Portfolio reaches ${formatCurrency(fiPortfolio)} — generating ${formatCurrency(fiPortfolio * swrDecimal)}/yr at ${formatNumber(swr)}% SWR to cover the ${formatCurrency(netExpAtFI)}/yr gap.` });
+
+    if (includePension && pensionAge < 999) {
+        const total = lifetimePension + bridgeBenefit;
+        const gap   = Math.max(0, expenses - total);
+        events.push({ age: pensionAge, isFI: false, title: 'DB Pension Starts',
+            body: (isGCMode && bridgeBenefit > 0)
+                ? `${formatCurrency(lifetimePension)}/yr lifetime + ${formatCurrency(bridgeBenefit)}/yr bridge = ${formatCurrency(total)}/yr. Portfolio covers ${formatCurrency(gap)}/yr gap. Bridge ends at 65.`
+                : `Pension begins at ${formatCurrency(total)}/yr. Portfolio covers ${formatCurrency(gap)}/yr gap.` });
+    }
+
+    if (includeCppOas && cppAmount > 0) {
+        const combined   = oasAge === cppAge && oasAmount > 0;
+        const incAtCpp   = getRetirementIncome(cppAge, benefits);
+        const gap        = Math.max(0, expenses - incAtCpp);
+        events.push({ age: cppAge, isFI: false, title: combined ? 'CPP & OAS Start' : 'CPP Starts',
+            body: combined
+                ? `CPP (${formatCurrency(cppAmount)}/yr) and OAS (${formatCurrency(oasAmount)}/yr) both begin. Portfolio covers ${formatCurrency(gap)}/yr shortfall.`
+                : `CPP begins at ${formatCurrency(cppAmount)}/yr. Portfolio covers ${formatCurrency(gap)}/yr shortfall.` });
+    }
+
+    if (includeCppOas && oasAmount > 0 && oasAge !== cppAge) {
+        const incAtOas = getRetirementIncome(oasAge, benefits);
+        const gap      = Math.max(0, expenses - incAtOas);
+        events.push({ age: oasAge, isFI: false, title: 'OAS Starts', body: `OAS begins at ${formatCurrency(oasAmount)}/yr. Portfolio covers ${formatCurrency(gap)}/yr shortfall.` });
+    }
+
+    events.sort((a, b) => a.age - b.age);
+
+    const items = events.map(e => `
+        <li class="report-timeline-item${e.isFI ? ' fi-item' : ''}">
+            <div class="report-timeline-age">
+                <span class="age-num">${formatNumber(e.age)}</span>
+                <span class="age-label">Age</span>
+            </div>
+            <div class="report-timeline-body">
+                <h4>${e.title}</h4>
+                <p>${e.body}</p>
+            </div>
+        </li>`).join('');
+
+    return `
+        <div class="report-section">
+            <div class="report-section-label">Section 4</div>
+            <h2>Your Financial Journey</h2>
+            <ul class="report-timeline">${items}</ul>
+        </div>`;
+}
+
+function rptBenchmarks(d, province, household) {
+    const { age, income, expenses } = d;
+
+    const hhLabels = { "Single": "Single / Unattached", "CoupleNoChildren": "Couple without children", "CoupleChildren": "Couple with children", "LoneParent": "Lone-parent family" };
+    const ageLabels = { "Under30": "Under 30", "30to39": "30–39", "40to54": "40–54", "55to64": "55–64", "Over65": "65 and over" };
+    let ag = "30to39";
+    if      (age < 30)  ag = "Under30";
+    else if (age <= 39) ag = "30to39";
+    else if (age <= 54) ag = "40to54";
+    else if (age <= 64) ag = "55to64";
+    else                ag = "Over65";
+
+    const benchInc  = STATCAN_DATA.incomeByProvinceAndType[province]?.[household] || 0;
+    const benchExpHH   = STATCAN_DATA.spendingByHousehold[household] || 0;
+    const benchExpProv = STATCAN_DATA.spendingByProvince[province]   || 0;
+    const benchExpAge  = STATCAN_DATA.spendingByAge[ag]               || 0;
+
+    const hhLabel  = hhLabels[household]  || household;
+    const ageLabel = ageLabels[ag] || ag;
+
+    function diffTag(diff, pct, higherGood) {
+        const good  = higherGood ? diff >= 0 : diff <= 0;
+        const color = diff === 0 ? 'var(--text-muted)' : (good ? '#34d399' : '#f87171');
+        return `<div class="compare-diff" style="color:${color};font-size:0.78rem;margin-top:0.3rem;">${diff >= 0 ? '+' : ''}${formatCurrency(diff)} (${diff >= 0 ? '+' : ''}${formatNumber(pct)}%) vs. benchmark</div>`;
+    }
+
+    const incDiff = income - benchInc;
+    const incPct  = benchInc > 0 ? incDiff / benchInc * 100 : 0;
+
+    const exDiffHH   = expenses - benchExpHH;   const exPctHH   = benchExpHH   > 0 ? exDiffHH   / benchExpHH   * 100 : 0;
+    const exDiffProv = expenses - benchExpProv;  const exPctProv = benchExpProv  > 0 ? exDiffProv / benchExpProv  * 100 : 0;
+    const exDiffAge  = expenses - benchExpAge;   const exPctAge  = benchExpAge   > 0 ? exDiffAge  / benchExpAge   * 100 : 0;
+
+    const provinces = ['Canada','Alberta','British Columbia','Manitoba','New Brunswick','Newfoundland and Labrador','Nova Scotia','Ontario','Prince Edward Island','Quebec','Saskatchewan'];
+    const provOpts  = provinces.map(p => `<option value="${p}"${p===province?' selected':''}>${p}</option>`).join('');
+    const hhOpts    = [['Single','Single / Unattached'],['CoupleNoChildren','Couple without children'],['CoupleChildren','Couple with children'],['LoneParent','Lone parent']]
+                        .map(([v,l]) => `<option value="${v}"${v===household?' selected':''}>${l}</option>`).join('');
+
+    const incInterpret = income === 0 ? 'Enter your income on the Calculator tab to see this comparison.'
+        : incDiff >= 0 ? 'Above the median — generally greater capacity to save toward FI.'
+                       : 'Below the median for this group. Your DB pension or other income sources may compensate.';
+
+    const expInterpret = expenses === 0 ? 'Enter your expenses on the Calculator tab to see this comparison.'
+        : exDiffHH <= 0 ? `Below the average for a ${hhLabel} household — lower spending accelerates your path to FI.`
+                        : `Above the average for a ${hhLabel} household — this may reflect lifestyle, regional costs, or a life phase with elevated spending.`;
+
+    return `
+        <div class="report-section">
+            <div class="report-section-label">Section 5</div>
+            <h2>How You Compare to Other Canadians</h2>
+            <p class="report-narrative">Official Statistics Canada benchmarks grounded in real survey data. Adjust your reference group using the selectors below.</p>
+
+            <div class="report-selectors-row">
+                <div class="report-select-group">
+                    <label for="reportDemoProvince">Province</label>
+                    <div class="input-wrapper select-wrapper"><select id="reportDemoProvince">${provOpts}</select></div>
+                </div>
+                <div class="report-select-group">
+                    <label for="reportDemoHousehold">Household Composition</label>
+                    <div class="input-wrapper select-wrapper"><select id="reportDemoHousehold">${hhOpts}</select></div>
+                </div>
+            </div>
+
+            <div class="report-benchmark-block">
+                <h3>Income</h3>
+                <span class="report-benchmark-tag two-way">2-way comparison</span>
+                <div class="report-compare-row">
+                    <div class="report-compare-item user-item">
+                        <div class="compare-label">Your after-tax income</div>
+                        <div class="compare-val">${income > 0 ? formatCurrency(income) : '—'}</div>
+                    </div>
+                    <div class="report-compare-item">
+                        <div class="compare-label">${hhLabel} median · ${province}</div>
+                        <div class="compare-val">${formatCurrency(benchInc)}</div>
+                        ${income > 0 ? diffTag(incDiff, incPct, true) : ''}
+                    </div>
+                </div>
+                <div class="report-explanation">
+                    <strong>What you're seeing:</strong> Your income vs. the <em>median</em> after-tax income for a <strong>${hhLabel}</strong> household in <strong>${province}</strong>. The median is the exact midpoint — half of similar households earn more, half earn less. Source: <em>Statistics Canada, Canadian Income Survey (CIS 2024), Table 11-10-0190-01</em>.
+                    ${income > 0 ? '<br><br>' + incInterpret : ''}
+                </div>
+            </div>
+
+            <div class="report-benchmark-block">
+                <h3>Expenses</h3>
+                <span class="report-benchmark-tag three-way">3-way comparison</span>
+                <p class="report-narrative" style="font-size:0.83rem;margin-bottom:0.85rem;">Statistics Canada does not publish spending cross-tabulated by province + household type + age simultaneously — each dimension is a separate survey table. Three benchmarks are shown because each answers a different question.</p>
+                <div class="report-compare-row">
+                    <div class="report-compare-item user-item">
+                        <div class="compare-label">Your annual expenses</div>
+                        <div class="compare-val">${expenses > 0 ? formatCurrency(expenses) : '—'}</div>
+                    </div>
+                    <div class="report-compare-item">
+                        <div class="compare-label">Household type avg (Canada)</div>
+                        <div class="compare-val">${formatCurrency(benchExpHH)}</div>
+                        ${expenses > 0 ? diffTag(exDiffHH, exPctHH, false) : ''}
+                    </div>
+                    <div class="report-compare-item">
+                        <div class="compare-label">Provincial avg (${province})</div>
+                        <div class="compare-val">${formatCurrency(benchExpProv)}</div>
+                        ${expenses > 0 ? diffTag(exDiffProv, exPctProv, false) : ''}
+                    </div>
+                    <div class="report-compare-item">
+                        <div class="compare-label">Age group avg (${ageLabel})</div>
+                        <div class="compare-val">${formatCurrency(benchExpAge)}</div>
+                        ${expenses > 0 ? diffTag(exDiffAge, exPctAge, false) : ''}
+                    </div>
+                </div>
+                <div class="report-explanation">
+                    <strong>What each benchmark tells you:</strong>
+                    <ul style="margin:0.5rem 0 0;padding-left:1.2rem;line-height:1.65;">
+                        <li><strong>Household type (${hhLabel}):</strong> The most meaningful — family structure is the primary driver of spending. Canada-wide average for your household type. <em>SHS 2023, Table 11-10-0244-01.</em></li>
+                        <li><strong>Province (${province}):</strong> All households in your province regardless of type — shows geographic cost differences. <em>SHS 2023, Table 11-10-0222-01.</em></li>
+                        <li><strong>Age group (${ageLabel}):</strong> Canada-wide average for your age bracket — spending peaks at 40–54 and declines significantly post-65. <em>SHS 2023, Table 11-10-0227-01.</em></li>
+                    </ul>
+                    ${expenses > 0 ? '<br>' + expInterpret : ''}
+                </div>
+            </div>
+        </div>`;
+}
+
+function rptAssumptions(d) {
+    const { roiAnnual, swr, isGCMode, bridgeBenefit } = d;
+    return `
+        <div class="report-section">
+            <div class="report-section-label">Section 6</div>
+            <h2>Key Assumptions</h2>
+            <ul style="color:var(--text-muted);line-height:1.75;padding-left:1.25rem;font-size:0.88rem;">
+                <li><strong>Annual Return (${formatNumber(roiAnnual)}%):</strong> Post-tax and inflation-adjusted. All figures are in today's dollars.</li>
+                <li><strong>Safe Withdrawal Rate (${formatNumber(swr)}%):</strong> Determines the portfolio target. Based on Bengen (1994) — a balanced portfolio can sustain this withdrawal rate over 30+ years.</li>
+                <li><strong>Compounding:</strong> Simulated monthly for precision.</li>
+                <li><strong>Terminal age:</strong> 100. FI is the earliest point your portfolio can sustain withdrawals to age 100.</li>
+                ${isGCMode && bridgeBenefit > 0 ? '<li><strong>Bridge Benefit:</strong> Assumed to end at precisely age 65, per standard PSSA structure.</li>' : ''}
+                <li><strong>Primary residence:</strong> Excluded from portfolio calculations.</li>
+            </ul>
+            <p class="report-narrative" style="margin-top:1rem;font-size:0.82rem;">For personal scenario planning only — not financial advice. See <a href="methodology.html" style="color:var(--accent-color);">the full methodology</a> for complete details and data sources.</p>
+        </div>`;
+}
+
+// Tab switching: Calculator <-> Report
+(function () {
+    const tabCalc   = document.getElementById('navTabCalculator');
+    const tabReport = document.getElementById('navTabReport');
+    if (!tabCalc || !tabReport) return;
+
+    const dashboard = document.querySelector('.dashboard');
+    const compPanel = document.getElementById('comparisonPanel');
+    const repPanel  = document.getElementById('reportPanel');
+
+    function setView(view) {
+        const isReport = view === 'report';
+        dashboard.style.display = isReport ? 'none' : '';
+        compPanel.style.display = isReport ? 'none' : '';
+        repPanel.style.display  = isReport ? 'block' : 'none';
+        tabCalc.classList.toggle('active', !isReport);
+        tabReport.classList.toggle('active', isReport);
+    }
+
+    tabCalc.addEventListener('click',   e => { e.preventDefault(); setView('calculator'); });
+    tabReport.addEventListener('click', e => { e.preventDefault(); setView('report'); });
+}());
