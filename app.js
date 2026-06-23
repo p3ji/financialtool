@@ -550,7 +550,7 @@ function calculateRetirement() {
                 bal = bal * (1 + rMonthly) + savings / 12;
             } else {
                 const passiveIncome = getRetirementIncome(currentAge, benfts);
-                bal = Math.max(0, bal * (1 + rMonthly) - Math.max(0, expenses - passiveIncome) / 12);
+                bal = bal * (1 + rMonthly) - Math.max(0, expenses - passiveIncome) / 12;
             }
 
             // End-of-year aggregation
@@ -586,8 +586,11 @@ function calculateRetirement() {
     if (main.fiMonth === null) {
         results.yearsToFI.innerText   = "N/A";
         results.fiAge.innerText       = "100+";
-        results.fiPortfolio.innerText = "N/A";
-        chartStatus.innerText    = "FI not achievable";
+        // FI portfolio target at planned retirement age (or current age if no ret age set)
+        const fiTargetRefAge = (includeRetAge && plannedRetAge > age) ? plannedRetAge : age;
+        const fiTargetAtRet  = getRequiredBalanceAtAge(fiTargetRefAge, expenses, swrDecimal, rMonthly, benefits);
+        results.fiPortfolio.innerText = formatCurrency(fiTargetAtRet);
+        chartStatus.innerText    = "FI not achievable before retirement";
         chartStatus.style.color  = "#ef4444";
         chartStatus.className    = "badge badge-danger";
         if (btnToggleTable) btnToggleTable.style.display = 'none';
@@ -971,8 +974,8 @@ function renderChart(data, empRetAge, fiAge, benefits, showBridgeEnd, dataNoPens
                 x: { type: 'linear', title: { display: true, text: 'Age' }, grid: { color: 'rgba(255,255,255,0.05)' } },
                 y: {
                     title: { display: true, text: 'Balance ($)' },
-                    grid: { color: 'rgba(255,255,255,0.05)' },
-                    ticks: { callback: (val) => '$' + (val / 1000) + 'k' }
+                    grid: { color: (ctx) => ctx.tick.value === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.05)' },
+                    ticks: { callback: (val) => (val < 0 ? '-$' : '$') + Math.abs(val / 1000) + 'k' }
                 }
             }
         },
