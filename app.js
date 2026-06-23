@@ -590,13 +590,13 @@ function calculateRetirement() {
         const fiTargetRefAge = (includeRetAge && plannedRetAge > age) ? plannedRetAge : age;
         const fiTargetAtRet  = getRequiredBalanceAtAge(fiTargetRefAge, expenses, swrDecimal, rMonthly, benefits);
         results.fiPortfolio.innerText = formatCurrency(fiTargetAtRet);
-        chartStatus.innerText    = "FI not achievable before retirement";
+        chartStatus.innerText    = includeRetAge ? "FI not achievable before retirement" : "FI not achievable";
         chartStatus.style.color  = "#ef4444";
         chartStatus.className    = "badge badge-danger";
         if (btnToggleTable) btnToggleTable.style.display = 'none';
         if (detailedTableContainer) detailedTableContainer.style.display = 'none';
         if (targetSplitRow) targetSplitRow.style.display = 'none';
-        renderChart(main.simData, plannedRetAge, null, benefits, isGCMode && bridgeBenefit > 0, noPen ? noPen.simData : []);
+        renderChart(main.simData, includeRetAge ? plannedRetAge : null, null, benefits, isGCMode && bridgeBenefit > 0, noPen ? noPen.simData : []);
 
         // Show partial timeline — FI not reached, but income milestones still relevant
         const balAtEmpRetPartial = (() => {
@@ -610,7 +610,7 @@ function calculateRetirement() {
             <div class="timeline-marker"></div>
             <div class="timeline-content">
                 <h4>Today (Age ${formatNumber(age)})</h4>
-                <p>Starting with ${formatCurrency(balance)} in investment portfolio. At current savings rate, FI target is not reachable before retirement.</p>
+                <p>Starting with ${formatCurrency(balance)} in investment portfolio. At current savings rate, the FI target of ${formatCurrency(fiTargetAtRet)} is not reachable${includeRetAge ? ` before retirement at age ${formatNumber(plannedRetAge)}` : ''}.</p>
             </div>
         </li>` });
         if (includeRetAge) {
@@ -624,7 +624,7 @@ function calculateRetirement() {
             </div>
         </li>` });
         }
-        if (includePension && pensionAge < 999) {
+        if (includePension && pensionAge < 999 && pensionAge > age) {
             partialEvents.push({ age: pensionAge, html: `
         <li class="timeline-item">
             <div class="timeline-marker"></div>
@@ -634,7 +634,7 @@ function calculateRetirement() {
             </div>
         </li>` });
         }
-        if (includeCppOas && cppAmount > 0) {
+        if (includeCppOas && cppAmount > 0 && cppAge > age) {
             const cppTitle = (oasAge === cppAge) ? `CPP &amp; OAS Start (Age ${formatNumber(cppAge)})` : `CPP Starts (Age ${formatNumber(cppAge)})`;
             partialEvents.push({ age: cppAge, html: `
         <li class="timeline-item timeline-cpp">
@@ -645,7 +645,7 @@ function calculateRetirement() {
             </div>
         </li>` });
         }
-        if (includeCppOas && oasAmount > 0 && oasAge !== cppAge) {
+        if (includeCppOas && oasAmount > 0 && oasAge !== cppAge && oasAge > age) {
             partialEvents.push({ age: oasAge, html: `
         <li class="timeline-item timeline-oas">
             <div class="timeline-marker"></div>
@@ -714,9 +714,34 @@ function calculateRetirement() {
     timelinePanel.style.display = "block";
 
     const netExpAtFI = Math.max(0, expenses - getRetirementIncome(fiAge, benefits));
-    const fiDesc = netExpAtFI === 0
-        ? `Portfolio + income sources fully cover all expenses. No drawdown needed.`
-        : `Portfolio generates ${formatCurrency(fiPortfolio * swrDecimal)}/yr at ${swr}% SWR — covers the ${formatCurrency(netExpAtFI)}/yr not met by other income.`;
+
+    // Determine whether all income sources are active by FI age (needed to pick correct wording)
+    const fiTransitionAges = [];
+    if (pensionAge < 999) {
+        fiTransitionAges.push(pensionAge);
+        if (bridgeBenefit > 0 && pensionAge < 65) fiTransitionAges.push(65);
+    }
+    if (cppAge < 999) fiTransitionAges.push(cppAge);
+    if (oasAge < 999) fiTransitionAges.push(oasAge);
+    const fiTerminalAge = fiTransitionAges.length > 0 ? Math.max(...fiTransitionAges) : 0;
+    const allSourcesActiveAtFI = fiTerminalAge === 0 || fiAge >= fiTerminalAge;
+
+    const terminalIncome = (pensionAge < 999 ? lifetimePension : 0) +
+                           (cppAge    < 999 ? cppAmount        : 0) +
+                           (oasAge    < 999 ? oasAmount        : 0) +
+                           rentalIncome;
+    const terminalGap = Math.max(0, expenses - terminalIncome);
+
+    let fiDesc;
+    if (netExpAtFI === 0) {
+        fiDesc = `Income sources fully cover all expenses at this age — no portfolio drawdown needed.`;
+    } else if (allSourcesActiveAtFI) {
+        fiDesc = `Portfolio generates ${formatCurrency(fiPortfolio * swrDecimal)}/yr at ${swr}% SWR to cover the ${formatCurrency(netExpAtFI)}/yr gap after income sources.`;
+    } else {
+        fiDesc = terminalGap <= 0
+            ? `Portfolio of ${formatCurrency(fiPortfolio)} bridges all expenses until income sources take over completely.`
+            : `Portfolio of ${formatCurrency(fiPortfolio)} bridges expenses to your income sources, then sustains a ${formatCurrency(terminalGap)}/yr drawdown at ${swr}% SWR.`;
+    }
 
     // Collect events — each has a sort key (age) and an HTML string
     const events = [];
@@ -763,8 +788,8 @@ function calculateRetirement() {
             </div>
         </li>` });
 
-    // DB Pension
-    if (includePension && pensionAge < 999) {
+    // DB Pension (only if starts in the future)
+    if (includePension && pensionAge < 999 && pensionAge > age) {
         const pBody = describeIncomeAt(pensionAge, expenses, benefits, isGCMode);
         events.push({ age: pensionAge, html: `
         <li class="timeline-item">
@@ -776,8 +801,8 @@ function calculateRetirement() {
         </li>` });
     }
 
-    // CPP
-    if (includeCppOas && cppAmount > 0) {
+    // CPP (only if starts in the future)
+    if (includeCppOas && cppAmount > 0 && cppAge > age) {
         const cppTitle = (oasAge === cppAge) ? `CPP &amp; OAS Start (Age ${formatNumber(cppAge)})` : `CPP Starts (Age ${formatNumber(cppAge)})`;
         const cppBody = describeIncomeAt(cppAge, expenses, benefits, isGCMode);
         events.push({ age: cppAge, html: `
@@ -790,8 +815,8 @@ function calculateRetirement() {
         </li>` });
     }
 
-    // OAS (only if different age from CPP)
-    if (includeCppOas && oasAmount > 0 && oasAge !== cppAge) {
+    // OAS (only if different age from CPP and starts in the future)
+    if (includeCppOas && oasAmount > 0 && oasAge !== cppAge && oasAge > age) {
         const oasBody = describeIncomeAt(oasAge, expenses, benefits, isGCMode);
         events.push({ age: oasAge, html: `
         <li class="timeline-item timeline-oas">
@@ -807,7 +832,7 @@ function calculateRetirement() {
     events.sort((a, b) => a.age - b.age);
     timelineList.innerHTML = events.map(e => e.html).join('');
 
-    renderChart(main.simData, plannedRetAge, fiAge, benefits, isGCMode && bridgeBenefit > 0, noPen ? noPen.simData : []);
+    renderChart(main.simData, includeRetAge ? plannedRetAge : null, fiAge, benefits, isGCMode && bridgeBenefit > 0, noPen ? noPen.simData : []);
     renderDetailedTable(main.yearlyData, roiAnnual);
 
     if (typeof updateDemographicBenchmarks === 'function') updateDemographicBenchmarks();
