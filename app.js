@@ -590,11 +590,71 @@ function calculateRetirement() {
         chartStatus.innerText    = "FI not achievable";
         chartStatus.style.color  = "#ef4444";
         chartStatus.className    = "badge badge-danger";
-        timelinePanel.style.display = "none";
         if (btnToggleTable) btnToggleTable.style.display = 'none';
         if (detailedTableContainer) detailedTableContainer.style.display = 'none';
         if (targetSplitRow) targetSplitRow.style.display = 'none';
         renderChart(main.simData, plannedRetAge, null, benefits, isGCMode && bridgeBenefit > 0, noPen ? noPen.simData : []);
+
+        // Show partial timeline — FI not reached, but income milestones still relevant
+        const balAtEmpRetPartial = (() => {
+            let b = balance;
+            for (let m = 0; m < monthsToEmpStop; m++) b = b * (1 + rMonthly) + savings / 12;
+            return b;
+        })();
+        const partialEvents = [];
+        partialEvents.push({ age, html: `
+        <li class="timeline-item">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>Today (Age ${formatNumber(age)})</h4>
+                <p>Starting with ${formatCurrency(balance)} in investment portfolio. At current savings rate, FI target is not reachable before retirement.</p>
+            </div>
+        </li>` });
+        if (includeRetAge) {
+            const incDesc = describeIncomeAt(plannedRetAge, expenses, benefits, isGCMode);
+            partialEvents.push({ age: plannedRetAge, html: `
+        <li class="timeline-item timeline-emp-ret">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>Employment Retirement (Age ${formatNumber(plannedRetAge)})</h4>
+                <p>Stop working. Portfolio at ${formatCurrency(balAtEmpRetPartial)}. ${incDesc}</p>
+            </div>
+        </li>` });
+        }
+        if (includePension && pensionAge < 999) {
+            partialEvents.push({ age: pensionAge, html: `
+        <li class="timeline-item">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>DB Pension Starts (Age ${formatNumber(pensionAge)})</h4>
+                <p>${describeIncomeAt(pensionAge, expenses, benefits, isGCMode)}</p>
+            </div>
+        </li>` });
+        }
+        if (includeCppOas && cppAmount > 0) {
+            const cppTitle = (oasAge === cppAge) ? `CPP &amp; OAS Start (Age ${formatNumber(cppAge)})` : `CPP Starts (Age ${formatNumber(cppAge)})`;
+            partialEvents.push({ age: cppAge, html: `
+        <li class="timeline-item timeline-cpp">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>${cppTitle}</h4>
+                <p>${describeIncomeAt(cppAge, expenses, benefits, isGCMode)}</p>
+            </div>
+        </li>` });
+        }
+        if (includeCppOas && oasAmount > 0 && oasAge !== cppAge) {
+            partialEvents.push({ age: oasAge, html: `
+        <li class="timeline-item timeline-oas">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>OAS Starts (Age ${formatNumber(oasAge)})</h4>
+                <p>${describeIncomeAt(oasAge, expenses, benefits, isGCMode)}</p>
+            </div>
+        </li>` });
+        }
+        partialEvents.sort((a, b) => a.age - b.age);
+        timelineList.innerHTML = partialEvents.map(e => e.html).join('');
+        timelinePanel.style.display = 'block';
         renderReport({ age, income, expenses, savings, savingsRate, balance, rentalIncome,
             roiAnnual, swr, swrDecimal, includeRetAge, plannedRetAge,
             includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
@@ -829,8 +889,8 @@ function renderChart(data, empRetAge, fiAge, benefits, showBridgeEnd, dataNoPens
                 ctx.fillText(label, xPx + 4, yAxis.top + yOffset);
             };
 
-            // Employment retirement line (only if different from FI)
-            if (empRetAge && fiAge && Math.abs(empRetAge - fiAge) > 0.1) {
+            // Employment retirement line (always show when set, unless it coincides with FI)
+            if (empRetAge && (!fiAge || Math.abs(empRetAge - fiAge) > 0.1)) {
                 drawLine(empRetAge, '#94a3b8', 'Retire', 15);
             }
             // FI line
