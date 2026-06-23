@@ -136,6 +136,36 @@
                 <li><strong>Bridge Benefit End Age:</strong> The calculator strictly assumes the Bridge Benefit terminates precisely at age 65, aligning with standard Canadian public service pension plan structures.</li>
                 <li><strong>Compounding Frequency:</strong> Growth and withdrawals are simulated on a monthly basis to provide an exact "months to retirement" figure.</li>
             </ul>
+
+            <h2 id="benchmarks">Statistics Canada Demographic Benchmarks</h2>
+            <p>
+                To help users ground their retirement projections in real-world context, this calculator incorporates official socio-economic benchmarks from Statistics Canada. Because spending and income are collected through different national surveys, their data structures differ. We present these comparisons under the following framework:
+            </p>
+
+            <h3>1. Income Benchmarks</h3>
+            <p>
+                Income data is sourced from the <strong>Canadian Income Survey (CIS, 2024)</strong>, specifically <strong>Table 11-10-0190-01</strong> (formerly CANSIM 206-0011).
+            </p>
+            <ul>
+                <li><strong>Unit of Analysis:</strong> "Economic Families" (two or more related people living in the same dwelling) and "Unattached Individuals" (persons not in an economic family).</li>
+                <li><strong>Concept:</strong> We use <strong>Median After-Tax Income</strong>. This is the exact middle point of disposable income (all income minus personal income taxes). Using after-tax median income ensures CPP, EI, and general taxes are already factored out, aligning with the "post-tax" income input of the calculator.</li>
+                <li><strong>Data Granularity:</strong> This dataset is fully cross-tabulated. When you select a Province and a Household Composition, the calculator displays the exact, official median after-tax income for that specific combination (e.g., Ontario Couple with children = $135,200).</li>
+            </ul>
+
+            <h3>2. Expense Benchmarks</h3>
+            <p>
+                Expenditure data is sourced from the <strong>Survey of Household Spending (SHS, 2023)</strong>.
+            </p>
+            <ul>
+                <li><strong>Concept:</strong> We use <strong>Total Current Consumption</strong>. This metric represents expenditures on goods and services (food, shelter, utilities, transportation, healthcare, etc.). It strictly excludes personal income taxes, pension contributions, and insurance premiums, ensuring it aligns with the "Annual Expenses" input of the calculator without double-counting savings.</li>
+                <li><strong>Data Granularity and Limitations:</strong> Unlike income, Statistics Canada does not publish spending data cross-tabulated by province, age, and household type together. Instead, these dimensions are published in separate tables:
+                    <ul>
+                        <li><strong>Household Type (Table 11-10-0244-01):</strong> Canada-wide average spending broken down by household composition. Because family structure is the primary driver of spending, this is used as the primary benchmark.</li>
+                        <li><strong>Geography (Table 11-10-0222-01):</strong> Average spending by province. This provides geographic context (e.g., higher average costs in Alberta/Ontario versus Atlantic Canada).</li>
+                        <li><strong>Age (Table 11-10-0227-01):</strong> Average Canada-wide spending by the age of the reference person. This shows how spending naturally contracts or expands at different life stages.</li>
+                    </ul>
+                </li>
+            </ul>
         </main>
     </div>
 </body>

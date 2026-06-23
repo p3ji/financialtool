@@ -33,7 +33,8 @@
             <!-- Left Column: Inputs -->
             <section class="glass-panel inputs-section">
                 <h2>Your Financial Profile</h2>
-                
+
+                <!-- Core: always visible -->
                 <div class="input-group">
                     <label for="currentAge">Current Age</label>
                     <div class="input-wrapper">
@@ -43,18 +44,10 @@
                 </div>
 
                 <div class="input-group">
-                    <label for="currentBalance">Current Portfolio Balance</label>
+                    <label for="annualIncome">Annual Income <span class="label-hint">post-tax</span></label>
                     <div class="input-wrapper">
                         <span class="currency">$</span>
-                        <input type="number" id="currentBalance" value="100000" min="0" step="1000">
-                    </div>
-                </div>
-
-                <div class="input-group">
-                    <label for="annualIncome">Annual Income (Post-Tax)</label>
-                    <div class="input-wrapper">
-                        <span class="currency">$</span>
-                        <input type="number" id="annualIncome" value="80000" min="0" step="1000">
+                        <input type="number" id="annualIncome" value="" min="0" step="1000">
                     </div>
                 </div>
 
@@ -62,81 +55,225 @@
                     <label for="annualExpenses">Annual Expenses</label>
                     <div class="input-wrapper">
                         <span class="currency">$</span>
-                        <input type="number" id="annualExpenses" value="50000" min="0" step="1000">
+                        <input type="number" id="annualExpenses" value="" min="0" step="1000">
                     </div>
-                </div>
-
-                <div class="divider"></div>
-                <h2>Pension Details</h2>
-                
-                <div class="mode-toggle">
-                    <button class="toggle-btn active" id="btnSimpleMode">Simple DB</button>
-                    <button class="toggle-btn" id="btnGCMode">MyGCPension</button>
-                </div>
-
-                <div id="simpleDbInputs">
-                    <div class="input-group">
-                        <label for="pensionAge">Age Pension Begins</label>
-                        <div class="input-wrapper">
-                            <input type="number" id="pensionAge" value="60" min="40" max="80">
-                            <span class="unit">Yrs</span>
+                    <div class="savings-summary-box" id="savingsSummaryBox">
+                        <div class="savings-metric">
+                            <span class="metric-label">Annual Savings</span>
+                            <span class="metric-val" id="profileAnnualSavings">--</span>
                         </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="pensionAmount">DB Pension Annual Amount</label>
-                        <div class="input-wrapper">
-                            <span class="currency">$</span>
-                            <input type="number" id="pensionAmount" value="30000" min="0" step="1000">
-                        </div>
-                    </div>
-                </div>
-
-                <div id="gcDbInputs" style="display: none;">
-                    <div class="input-group">
-                        <label for="gcPensionAge">Age Pension Begins</label>
-                        <div class="input-wrapper">
-                            <input type="number" id="gcPensionAge" value="60" min="40" max="80">
-                            <span class="unit">Yrs</span>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="gcLifetimePension">Annual Lifetime Pension</label>
-                        <div class="input-wrapper">
-                            <span class="currency">$</span>
-                            <input type="number" id="gcLifetimePension" value="20000" min="0" step="1000">
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="gcBridgeBenefit">Annual Bridge Benefit (stops at 65)</label>
-                        <div class="input-wrapper">
-                            <span class="currency">$</span>
-                            <input type="number" id="gcBridgeBenefit" value="10000" min="0" step="1000">
+                        <div class="savings-metric">
+                            <span class="metric-label">Savings Rate</span>
+                            <span class="metric-val" id="profileSavingsRate">--</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="divider"></div>
-                <h2>Assumptions</h2>
 
-                <div class="input-group-row">
-                    <div class="input-group half">
-                        <label for="roi">Annual Return</label>
+                <!-- Optional: Planned Retirement Date -->
+                <div class="input-group checkbox-group">
+                    <label class="checkbox-wrapper">
+                        <input type="checkbox" id="chkIncludeRetAge">
+                        <span class="checkbox-label">Add Planned Retirement Date</span>
+                    </label>
+                </div>
+                <div id="retAgeSection" style="display: none;">
+                    <div class="input-group optional-input">
+                        <label for="plannedRetirementAge">Planned Retirement Age <span class="label-hint">when you stop working</span></label>
                         <div class="input-wrapper">
-                            <input type="number" id="roi" value="5.0" min="0" max="20" step="0.1">
-                            <span class="unit">%</span>
-                        </div>
-                    </div>
-                    <div class="input-group half">
-                        <label for="swr">Withdrawal Rate</label>
-                        <div class="input-wrapper">
-                            <input type="number" id="swr" value="4.0" min="1" max="10" step="0.1">
-                            <span class="unit">%</span>
+                            <input type="number" id="plannedRetirementAge" value="55" min="18" max="100">
+                            <span class="unit">Yrs</span>
                         </div>
                     </div>
                 </div>
+
+                <!-- Optional: Investment Portfolio -->
+                <div class="input-group checkbox-group">
+                    <label class="checkbox-wrapper">
+                        <input type="checkbox" id="chkIncludePortfolio">
+                        <span class="checkbox-label">Add Investment Portfolio</span>
+                    </label>
+                </div>
+                <div id="portfolioSection" style="display: none;">
+                    <div class="mode-toggle optional-input">
+                        <button type="button" class="toggle-btn active" id="btnPortfolioSimple">Simple</button>
+                        <button type="button" class="toggle-btn" id="btnPortfolioDetailed">Detailed</button>
+                    </div>
+
+                    <div id="simplePortfolioInputs">
+                        <div class="input-group optional-input">
+                            <label for="currentBalance">Current Portfolio Balance</label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="currentBalance" value="100000" min="0" step="1000">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="detailedPortfolioInputs" style="display: none;">
+                        <div class="input-group optional-input">
+                            <label for="rrspBalance">RRSP Balance</label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="rrspBalance" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                        <div class="input-group optional-input">
+                            <label for="tfasaBalance">TFSA Balance</label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="tfasaBalance" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                        <div class="input-group optional-input">
+                            <label for="nonRegBalance">Non-Registered Balance</label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="nonRegBalance" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                        <div class="input-group optional-input">
+                            <label for="incomePropertyValue">Income Property Value</label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="incomePropertyValue" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                        <div class="input-group optional-input">
+                            <label for="rentalIncome">Annual Rental Income <span class="label-hint">net of expenses</span></label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="rentalIncome" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Optional: DB Pension -->
+                <div class="input-group checkbox-group">
+                    <label class="checkbox-wrapper">
+                        <input type="checkbox" id="chkIncludePension">
+                        <span class="checkbox-label">Add DB Pension Plan</span>
+                    </label>
+                </div>
+                <div id="pensionDetailsSection" style="display: none;">
+                    <div class="mode-toggle optional-input">
+                        <button type="button" class="toggle-btn active" id="btnSimpleMode">Simple DB</button>
+                        <button type="button" class="toggle-btn" id="btnGCMode">MyGCPension</button>
+                    </div>
+                    <div id="simpleDbInputs">
+                        <div class="input-group optional-input">
+                            <label for="pensionAge">Age Pension Begins</label>
+                            <div class="input-wrapper">
+                                <input type="number" id="pensionAge" value="60" min="40" max="80">
+                                <span class="unit">Yrs</span>
+                            </div>
+                        </div>
+                        <div class="input-group optional-input">
+                            <label for="pensionAmount">Annual Pension Amount</label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="pensionAmount" value="30000" min="0" step="1000">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="gcDbInputs" style="display: none;">
+                        <div class="input-group optional-input">
+                            <label for="gcPensionAge">Age Pension Begins</label>
+                            <div class="input-wrapper">
+                                <input type="number" id="gcPensionAge" value="60" min="40" max="80">
+                                <span class="unit">Yrs</span>
+                            </div>
+                        </div>
+                        <div class="input-group optional-input">
+                            <label for="gcLifetimePension">Annual Lifetime Pension</label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="gcLifetimePension" value="20000" min="0" step="1000">
+                            </div>
+                        </div>
+                        <div class="input-group optional-input">
+                            <label for="gcBridgeBenefit">Annual Bridge Benefit <span class="label-hint">stops at 65</span></label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="gcBridgeBenefit" value="10000" min="0" step="1000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Optional: CPP & OAS -->
+                <div class="input-group checkbox-group">
+                    <label class="checkbox-wrapper">
+                        <input type="checkbox" id="chkIncludeCppOas">
+                        <span class="checkbox-label">Add CPP &amp; OAS</span>
+                    </label>
+                </div>
+                <div id="cppOasSection" style="display: none;">
+                    <div class="input-group optional-input">
+                        <label for="cppStartAge">CPP Start Age <span class="label-hint">60 = −36% &nbsp;|&nbsp; 65 = standard &nbsp;|&nbsp; 70 = +42%</span></label>
+                        <div class="input-wrapper">
+                            <input type="number" id="cppStartAge" value="65" min="60" max="70">
+                            <span class="unit">Yrs</span>
+                        </div>
+                        <div id="cppAdjNote" class="benefit-adj-note"></div>
+                    </div>
+                    <div class="input-group optional-input">
+                        <label for="cppAmountAt65">Est. CPP at Age 65 <span class="label-hint">from Service Canada statement</span></label>
+                        <div class="input-wrapper">
+                            <span class="currency">$</span>
+                            <input type="number" id="cppAmountAt65" value="12000" min="0" step="500">
+                        </div>
+                    </div>
+                    <div class="input-group optional-input">
+                        <label for="oasStartAge">OAS Start Age <span class="label-hint">65 = standard &nbsp;|&nbsp; 70 = +36%</span></label>
+                        <div class="input-wrapper">
+                            <input type="number" id="oasStartAge" value="65" min="65" max="70">
+                            <span class="unit">Yrs</span>
+                        </div>
+                        <div id="oasAdjNote" class="benefit-adj-note"></div>
+                    </div>
+                    <div class="input-group optional-input">
+                        <label for="oasAmountAt65">Est. OAS at Age 65 <span class="label-hint">max 2025: ~$8,700/yr</span></label>
+                        <div class="input-wrapper">
+                            <span class="currency">$</span>
+                            <input type="number" id="oasAmountAt65" value="8700" min="0" step="100">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- Collapsible Assumptions -->
+                <details class="assumptions-details">
+                    <summary class="assumptions-summary">Assumptions</summary>
+                    <div class="assumptions-body">
+                        <div class="input-group-row">
+                            <div class="input-group half">
+                                <label for="roi">Annual Return <span class="label-hint">post-tax, real</span></label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="roi" value="5.0" min="0" max="20" step="0.1">
+                                    <span class="unit">%</span>
+                                </div>
+                            </div>
+                            <div class="input-group half">
+                                <label for="swr">Safe Withdrawal Rate</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="swr" value="4.0" min="1" max="10" step="0.1">
+                                    <span class="unit">%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <ul class="assumptions-notes">
+                            <li>Primary residence excluded from portfolio; projections in today's dollars (real return handles inflation)</li>
+                            <li>Portfolio target = (Annual Expenses − Passive Income) ÷ SWR% (the 4% Rule, Bengen 1994)</li>
+                            <li>Annual income is post-tax; annual return is post-tax and inflation-adjusted</li>
+                            <li><a href="methodology.html" style="color: var(--accent-color); text-decoration: underline;">Read methodology</a> for detailed assumptions and data sources</li>
+                        </ul>
+                    </div>
+                </details>
+
             </section>
 
             <!-- Right Column: Results & Chart -->
@@ -144,21 +281,25 @@
                 <!-- Summary Cards -->
                 <div class="summary-cards">
                     <div class="glass-panel card highlight-card">
-                        <h3>Time to Retirement</h3>
-                        <div class="value" id="resYearsToRetirement">--</div>
-                        <div class="subtext">Retire at age <span id="resRetirementAge">--</span></div>
-                    </div>
-                    
-                    <div class="glass-panel card">
-                        <h3>Target Portfolio</h3>
-                        <div class="value" id="resTargetPortfolio">--</div>
-                        <div class="subtext">Needed at retirement</div>
+                        <h3>Time to Financial Independence</h3>
+                        <div class="value" id="resYearsToFI">--</div>
+                        <div class="subtext">FI at age <span id="resFIAge">--</span></div>
                     </div>
 
                     <div class="glass-panel card">
-                        <h3>Annual Savings</h3>
-                        <div class="value" id="resAnnualSavings">--</div>
-                        <div class="subtext">Savings rate: <span id="resSavingsRate">--</span></div>
+                        <h3>FI Portfolio Target</h3>
+                        <div class="value" id="resFIPortfolio">--</div>
+                        <div class="target-split-row" id="targetSplitRow" style="display: none; justify-content: space-around; margin-top: 10px; border-top: 1px solid var(--panel-border); padding-top: 8px; margin-bottom: 5px;">
+                            <div class="split-col" style="text-align: center;">
+                                <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; display: block; margin-bottom: 2px;">With DB Pension</span>
+                                <span id="targetWithPensionVal" style="font-size: 1.1rem; font-weight: 600; color: var(--success-color);">--</span>
+                            </div>
+                            <div class="split-col" style="text-align: center;">
+                                <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; display: block; margin-bottom: 2px;">Without DB Pension</span>
+                                <span id="targetNoPensionVal" style="font-size: 1.1rem; font-weight: 600; color: #f87171;">--</span>
+                            </div>
+                        </div>
+                        <div class="subtext">Required for financial independence</div>
                     </div>
                 </div>
 
@@ -166,42 +307,126 @@
                 <div class="glass-panel chart-panel">
                     <div class="chart-header">
                         <h2>Portfolio Projection</h2>
-                        <div id="chartStatus" class="badge">Calculating...</div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button type="button" id="btnToggleTable" class="btn btn-secondary">Show Detailed Table</button>
+                            <div id="chartStatus" class="badge">Calculating...</div>
+                        </div>
                     </div>
                     <div class="chart-container">
                         <canvas id="retirementChart"></canvas>
+                    </div>
+
+                    <!-- Detailed Table -->
+                    <div id="detailedTableContainer" class="table-container" style="display: none; margin-top: 1.5rem;">
+                        <div class="table-wrapper">
+                            <table id="detailedTable">
+                                <thead>
+                                </thead>
+                                <tbody>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 
                 <!-- Timeline Info -->
                 <div class="glass-panel timeline-panel" id="timelinePanel">
-                    <h3>Retirement Timeline</h3>
-                    <ul class="timeline">
-                        <li class="timeline-item">
-                            <div class="timeline-marker"></div>
-                            <div class="timeline-content">
-                                <h4>Today (Age <span id="tlCurrentAge">--</span>)</h4>
-                                <p>Starting with <span id="tlCurrentBalance">--</span></p>
-                            </div>
-                        </li>
-                        <li class="timeline-item highlight" id="tlRetirementItem">
-                            <div class="timeline-marker"></div>
-                            <div class="timeline-content">
-                                <h4>Retirement (Age <span id="tlRetirementAge">--</span>)</h4>
-                                <p>Portfolio reaches <span id="tlRetirementBalance">--</span>. Portfolio funds 100% of expenses (<span id="tlExpenses">--</span>/yr) during the gap phase.</p>
-                            </div>
-                        </li>
-                        <li class="timeline-item" id="tlPensionItem">
-                            <div class="timeline-marker"></div>
-                            <div class="timeline-content">
-                                <h4>Pension Starts (Age <span id="tlPensionAge">--</span>)</h4>
-                                <p>Pension provides <span id="tlPensionAmount">--</span>/yr. Portfolio covers the remaining <span id="tlRemainingExpenses">--</span>/yr.</p>
-                            </div>
-                        </li>
-                    </ul>
+                    <h3>Financial Journey Timeline</h3>
+                    <ul class="timeline"></ul>
                 </div>
+
             </section>
         </main>
+
+        <!-- StatCan Benchmarks — separate full-width section below dashboard -->
+        <div class="glass-panel comparison-panel" id="comparisonPanel">
+            <div class="comparison-header">
+                <h2>How You Compare (StatCan Benchmarks)</h2>
+                <a href="methodology.html#benchmarks" class="benchmark-link">About the Data</a>
+            </div>
+
+            <div class="comparison-selectors">
+                <div class="comparison-select-group">
+                    <label for="demoProvince">Province</label>
+                    <div class="input-wrapper select-wrapper">
+                        <select id="demoProvince">
+                            <option value="Canada">Canada (Average)</option>
+                            <option value="Alberta">Alberta</option>
+                            <option value="British Columbia">British Columbia</option>
+                            <option value="Manitoba">Manitoba</option>
+                            <option value="New Brunswick">New Brunswick</option>
+                            <option value="Newfoundland and Labrador">Newfoundland and Labrador</option>
+                            <option value="Nova Scotia">Nova Scotia</option>
+                            <option value="Ontario" selected>Ontario</option>
+                            <option value="Prince Edward Island">Prince Edward Island</option>
+                            <option value="Quebec">Quebec</option>
+                            <option value="Saskatchewan">Saskatchewan</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="comparison-select-group">
+                    <label for="demoHousehold">Household Composition</label>
+                    <div class="input-wrapper select-wrapper">
+                        <select id="demoHousehold">
+                            <option value="Single">Single / Unattached</option>
+                            <option value="CoupleNoChildren">Couple without children</option>
+                            <option value="CoupleChildren" selected>Couple with children</option>
+                            <option value="LoneParent">Lone parent</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <p class="comparison-desc" style="margin-top: 1rem;">Comparing your current details against the closest official Statistics Canada benchmarks:</p>
+
+            <div class="comparison-cards">
+                <div class="comparison-card" id="incomeComparisonCard">
+                    <div class="card-title-row">
+                        <h3>Income Comparison</h3>
+                        <span class="badge" id="incomeBadge">--</span>
+                    </div>
+                    <div class="metric-row">
+                        <div class="metric-col">
+                            <span class="metric-label">Your After-Tax Income</span>
+                            <span class="metric-val" id="compUserIncome">--</span>
+                        </div>
+                        <div class="metric-col">
+                            <span class="metric-label" id="compIncomeBenchmarkLabel">Ontario Couple w/ Kids Median</span>
+                            <span class="metric-val" id="compBenchIncome">--</span>
+                        </div>
+                    </div>
+                    <p class="comparison-narrative" id="incomeNarrative">--</p>
+                </div>
+
+                <div class="comparison-card" id="expensesComparisonCard">
+                    <div class="card-title-row">
+                        <h3>Expenses Benchmarks</h3>
+                        <span class="badge" id="expensesBadge">--</span>
+                    </div>
+                    <div class="metric-row">
+                        <div class="metric-col">
+                            <span class="metric-label">Your Annual Expenses</span>
+                            <span class="metric-val" id="compUserExpenses">--</span>
+                        </div>
+                    </div>
+                    <div class="benchmarks-list">
+                        <div class="bench-item">
+                            <span class="bench-label">Household Type Avg (Canada):</span>
+                            <span class="bench-val" id="compBenchExpHousehold">--</span>
+                        </div>
+                        <div class="bench-item">
+                            <span class="bench-label">Provincial Avg (Local):</span>
+                            <span class="bench-val" id="compBenchExpProvince">--</span>
+                        </div>
+                        <div class="bench-item">
+                            <span class="bench-label">Age Group Avg (Canada):</span>
+                            <span class="bench-val" id="compBenchExpAge">--</span>
+                        </div>
+                    </div>
+                    <p class="comparison-narrative" id="expensesNarrative">--</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>
