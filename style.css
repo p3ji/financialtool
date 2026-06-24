@@ -999,6 +999,8 @@ details[open] .assumptions-summary::before {
 .timeline-oas .timeline-marker { background: #f97316; box-shadow: 0 0 0 2px rgba(249,115,22,0.3); }
 .timeline-cpp h4 { color: #22d3ee; }
 .timeline-oas h4 { color: #fb923c; }
+.timeline-depleted .timeline-marker { background: #ef4444; box-shadow: 0 0 0 2px rgba(239,68,68,0.3); }
+.timeline-depleted h4 { color: #f87171; }
 
 /* Table row highlights */
 #detailedTable tr.fi-row {

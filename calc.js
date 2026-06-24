@@ -17,6 +17,12 @@
     }
 })(typeof self !== 'undefined' ? self : this, function () {
 
+    // Nobody is assumed to work forever. The FI-detection (accumulation)
+    // pass stops employment at this age, so someone whose income never
+    // covers expenses can't "reach FI" by being modelled as working into
+    // their 90s — they correctly come back as "not achievable" instead.
+    const MAX_WORK_AGE = 75;
+
     // ---- Formatters ------------------------------------------------
     const formatCurrency = (val) =>
         new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
@@ -136,6 +142,7 @@
 
         let bal = balance;
         let fiMonth = null;
+        let depletionMonth = null;   // first month the portfolio hits $0
         const simData = [];
         const yearlyData = [];
 
@@ -201,6 +208,7 @@
             // Balance step — passive income always counts; surplus reinvests,
             // deficit draws down.
             bal = bal * (1 + rMonthly) + (empIncome + passiveIncome - expenses) / 12;
+            if (depletionMonth === null && bal <= 0) depletionMonth = m;
 
             // End-of-year aggregation
             const isEndOfYear = (m + 1) % 12 === 0;
@@ -222,7 +230,7 @@
             }
         }
 
-        return { fiMonth, simData, yearlyData };
+        return { fiMonth, depletionMonth, simData, yearlyData };
     }
 
     // ---- Balance at the employment-retirement date -----------------
@@ -246,9 +254,15 @@
         const { age, plannedRetAge, includeRetAge, expenses, swrDecimal, rMonthly,
                 benefits, includePension, benefitsNoPension } = params;
 
-        // FI detection: employment continues until FI (independent of the
-        // chosen retirement date).
-        const accum = runSimulation({ ...params, stopEmploymentAtRet: false });
+        // FI detection: employment runs to a realistic maximum working age
+        // (not forever), independent of the chosen retirement date. If FI is
+        // only "reachable" by working past MAX_WORK_AGE, it isn't reachable —
+        // fiMonth stays null and the UI reports "not achievable".
+        const accum = runSimulation({
+            ...params,
+            stopEmploymentAtRet: true,
+            plannedRetAge: MAX_WORK_AGE
+        });
         const fiMonth = accum.fiMonth;
 
         // Projection: uses the actual planned retirement date for chart/table.
@@ -277,8 +291,16 @@
             }
         }
 
+        // Age at which the *planned* projection runs the portfolio dry (if it
+        // does). Only meaningful when FI is not achievable — it lets the UI say
+        // "savings exhausted around age X" instead of implying a phantom FI.
+        const depletionAge = proj.depletionMonth !== null
+            ? age + proj.depletionMonth / 12
+            : null;
+
         return {
             fiMonth, fiAge, yearsToFI, fiPortfolio, fiPortfolioNoPension,
+            depletionAge,
             simData: proj.simData, yearlyData: proj.yearlyData,
             noPenSimData: noPen ? noPen.simData : [],
             balAtEmpRet: includeRetAge ? balanceAtAge(plannedRetAge, params) : params.balance
