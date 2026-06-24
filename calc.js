@@ -208,7 +208,7 @@
             // Balance step — passive income always counts; surplus reinvests,
             // deficit draws down.
             bal = bal * (1 + rMonthly) + (empIncome + passiveIncome - expenses) / 12;
-            if (depletionMonth === null && bal <= 0) depletionMonth = m;
+            if (depletionMonth === null && bal < 0) depletionMonth = m;
 
             // End-of-year aggregation
             const isEndOfYear = (m + 1) % 12 === 0;
