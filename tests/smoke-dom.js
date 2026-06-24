@@ -89,24 +89,22 @@ const reportHtml = doc.getElementById('reportPanel').innerHTML;
 if (/No passive income active/.test(reportHtml)) { console.log('✗ report still says "No passive income active"'); ok = false; }
 else console.log('✓ report free of stale "No passive income active" wording');
 
-// Verify the publication gate: a fresh load WITHOUT the override must hide the
-// Report tab and render no report content (so it can't be published/leaked).
-(function gateOff() {
+// Verify the Report tab is published and rendered.
+(function verifyReportPublished() {
     const d2 = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' });
     const w2 = d2.window;
     w2.Chart = FakeChart; w2.HTMLCanvasElement.prototype.getContext = () => ({}); w2.scrollTo = () => {};
-    // NOTE: deliberately NOT setting w2.__PUBLISH_REPORT_TAB__
     const run2 = f => new w2.Function(fs.readFileSync(path.join(ROOT, f), 'utf8')).call(w2);
-    try { run2('calc.js'); run2('app.js'); } catch (e) { console.log('✗ gate-off load threw:', e.message); ok = false; return; }
-    // Drive a full scenario so renderReport runs — gated off, it must produce no report.
+    try { run2('calc.js'); run2('app.js'); } catch (e) { console.log('✗ report check load threw:', e.message); ok = false; return; }
+    // Drive a full scenario so renderReport runs.
     const sv = (id, v) => { const e = w2.document.getElementById(id); e.value = String(v); e.dispatchEvent(new w2.Event('input', { bubbles: true })); };
     const sc = (id, o) => { const e = w2.document.getElementById(id); e.checked = o; e.dispatchEvent(new w2.Event('change', { bubbles: true })); };
     sv('currentAge', 40); sv('annualIncome', 120000); sv('annualExpenses', 60000);
     sc('chkIncludePortfolio', true); sv('currentBalance', 200000);
-    const tabHidden = w2.document.getElementById('navTabReport').style.display === 'none';
-    const noReportDoc = !/report-doc/.test(w2.document.getElementById('reportPanel').innerHTML);
-    if (tabHidden && noReportDoc) console.log('✓ gate off: Report tab hidden and report not rendered');
-    else { console.log(`✗ gate off failed (tabHidden=${tabHidden}, noReportDoc=${noReportDoc})`); ok = false; }
+    const tabVisible = w2.document.getElementById('navTabReport').style.display !== 'none';
+    const hasReportDoc = /report-doc/.test(w2.document.getElementById('reportPanel').innerHTML);
+    if (tabVisible && hasReportDoc) console.log('✓ Report tab published: nav visible and report rendered');
+    else { console.log(`✗ Report tab check failed (tabVisible=${tabVisible}, hasReportDoc=${hasReportDoc})`); ok = false; }
 })();
 
 console.log(ok ? '\nDOM SMOKE TEST PASSED' : '\nDOM SMOKE TEST FAILED');
