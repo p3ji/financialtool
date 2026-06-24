@@ -430,6 +430,50 @@ for (const roi of [0, 2, 8]) {
 })();
 
 // ------------------------------------------------------------
+// 15. Retiring BEFORE the FI age.
+//     The FI age stays the stable "earliest you could afford to stop" target
+//     (INV1). What changes is the projection: if retiring early drains the
+//     portfolio, depletionAge is set (loud warning). But retiring a little
+//     early can still survive when ROI outpaces the withdrawal rate — then
+//     there must be NO false depletion warning (the user's caveat).
+// ------------------------------------------------------------
+(function retireBeforeFi() {
+    // Retire well before FI, no income to fall back on → portfolio runs dry.
+    const broke = C.analyze(buildParams({
+        age: 35, income: 110000, expenses: 70000, balance: 50000,
+        includeRetAge: true, plannedRetAge: 45 }));
+    check('[retireBefore] FI age unchanged (stable target, INV1)',
+        broke.fiAge !== null && broke.fiAge > 45, `fiAge=${broke.fiAge}`);
+    check('[retireBefore] retiring too early flags a depletion age',
+        finite(broke.depletionAge) && broke.depletionAge > 45 && broke.depletionAge < broke.fiAge,
+        `depletionAge=${broke.depletionAge}`);
+
+    // Caveat: retire before the FI target but the portfolio is large enough that
+    // ROI (5%) outpaces the 4% withdrawal — it survives to 100. NO warning.
+    const survives = C.analyze(buildParams({
+        age: 35, income: 110000, expenses: 95000, balance: 1000000,
+        includeRetAge: true, plannedRetAge: 45 }));
+    const minBal = Math.min(...survives.yearlyData.map(y => y.networth));
+    check('[retireBefore] caveat: retiring early but surviving is NOT flagged',
+        survives.depletionAge === null && minBal > 0,
+        `depletionAge=${survives.depletionAge} minBal=${minBal.toFixed(0)}`);
+
+    // Retire AFTER FI: no depletion, FI age unchanged.
+    const after = C.analyze(buildParams({
+        age: 35, income: 110000, expenses: 70000, balance: 500000,
+        includeRetAge: true, plannedRetAge: 60 }));
+    check('[retireBefore] retiring after FI does not deplete',
+        after.fiAge !== null && after.depletionAge === null, `depletionAge=${after.depletionAge}`);
+
+    // The depletion classification is independent of how it's reached: same
+    // inputs, no retirement date → works to the horizon → no depletion.
+    const noRet = C.analyze(buildParams({
+        age: 35, income: 110000, expenses: 70000, balance: 50000 }));
+    check('[retireBefore] no retirement date → no early-exit depletion',
+        noRet.fiAge !== null && noRet.depletionAge === null, `depletionAge=${noRet.depletionAge}`);
+})();
+
+// ------------------------------------------------------------
 console.log(`\n${'='.repeat(60)}`);
 console.log(`Scenario tests: ${pass} passed, ${fail} failed`);
 if (failures.length) {
