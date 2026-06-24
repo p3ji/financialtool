@@ -8,6 +8,23 @@ Status: ✅ PASS | ❌ FAIL | ⚠️ WARN | 🔲 UNTESTED
 
 ---
 
+## Methodology & Edge Case Challenges
+
+The tool distinguishes three states for a retirement plan:
+
+1. **FI Achievable** (`fiAge ≠ null`): Portfolio reaches 4% SWR target → sustainable forever
+2. **FI Not Achievable + Depletion** (`fiAge = null`, `depletionAge ≠ null`): Plan breaks at age X → loud red warning
+3. **FI Not Achievable + Sustainable** (`fiAge = null`, `depletionAge = null`): Perpetual 4% SWR unmet, but ROI > withdrawal → plan survives to 100 → blue "On track" badge
+
+**Edge cases discovered:**
+- **Zero-balance break-even** (income = expenses, portfolio $0): Depletion check must use `bal < 0` not `bal <= 0`, else a sustainable zero-balance gets flagged as depleted at age 0.
+- **Perpetual FI vs. life-cycle FI**: A plan may never reach perpetual FI (4% SWR forever), but still be sustainable within a person's retirement horizon. Badges must distinguish these—users need "plan works" signals, not just "FI not achieved" warnings.
+- **Retirement date independence** (INV1): The FI age is determined by income/expenses/ROI alone, not by the chosen retirement date. But a user who retires *before* FI can still succeed if capital is sufficient. The depletion age depends on retirement date.
+
+**Testing strategy**: The 461 automated tests verify engine invariants (no NaN, FI age independence, etc.). The ODS matrix scenarios exercise UI/wording across real personas. Manual browser testing confirms that badge messaging matches plan viability.
+
+---
+
 ## Input Reference
 
 | Field | ID / Notes |
