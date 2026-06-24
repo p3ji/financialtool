@@ -407,10 +407,13 @@ function calculateRetirement() {
         chartStatus.innerText    = includeRetAge ? "FI not achievable before retirement" : "FI not achievable";
         chartStatus.style.color  = "#ef4444";
         chartStatus.className    = "badge badge-danger";
-        if (btnToggleTable) btnToggleTable.style.display = 'none';
-        if (detailedTableContainer) detailedTableContainer.style.display = 'none';
+        // Even when FI isn't achievable, keep the detailed table available — it
+        // shows the year-by-year drawdown (including where the balance goes
+        // negative), which is useful for understanding and debugging the plan.
+        if (btnToggleTable) btnToggleTable.style.display = 'inline-block';
         if (targetSplitRow) targetSplitRow.style.display = 'none';
         renderChart(main.simData, includeRetAge ? plannedRetAge : null, null, benefits, isGCMode && bridgeBenefit > 0, noPen ? noPen.simData : []);
+        renderDetailedTable(main.yearlyData, roiAnnual);
 
         // Show partial timeline — FI not reached, but income milestones still relevant
         const balAtEmpRetPartial = result.balAtEmpRet;
@@ -476,8 +479,13 @@ function calculateRetirement() {
             </div>
         </li>` });
         }
-        partialEvents.sort((a, b) => a.age - b.age);
-        timelineList.innerHTML = partialEvents.map(e => e.html).join('');
+        // Drop any milestone past the depletion age — once savings run out,
+        // later income milestones can't help and only mislead.
+        const visiblePartial = depletionAge
+            ? partialEvents.filter(e => e.age <= depletionAge + 1e-6)
+            : partialEvents;
+        visiblePartial.sort((a, b) => a.age - b.age);
+        timelineList.innerHTML = visiblePartial.map(e => e.html).join('');
         timelinePanel.style.display = 'block';
         if (typeof updateDemographicBenchmarks === 'function') updateDemographicBenchmarks();
         renderReport({ age, income, expenses, savings, savingsRate, balance, rentalIncome,
@@ -515,11 +523,23 @@ function calculateRetirement() {
         if (targetSplitRow) targetSplitRow.style.display = 'none';
     }
 
+    // The FI age is the stable "earliest you could afford to stop" target. But
+    // if the user plans to retire BEFORE they can afford to, the projected
+    // portfolio runs dry — surface that loudly. (depletionAge is null when the
+    // plan survives to 100, including the cases where retiring before the FI
+    // target still works because ROI > the withdrawal rate.)
+    const planDepletes = result.depletionAge != null;
     const fiBeforeRet = includeRetAge && fiAge <= plannedRetAge;
     const fiAfterRet  = includeRetAge && fiAge > plannedRetAge;
-    chartStatus.innerText   = fiBeforeRet ? "FI before retirement" : fiAfterRet ? "FI after retirement" : "FI achieved";
-    chartStatus.style.color = "";
-    chartStatus.className   = "badge " + (fiAfterRet ? "badge-info" : "badge-success");
+    if (planDepletes) {
+        chartStatus.innerText   = `Savings run out at age ${formatNumber(result.depletionAge)}`;
+        chartStatus.style.color = "#ef4444";
+        chartStatus.className   = "badge badge-danger";
+    } else {
+        chartStatus.innerText   = fiBeforeRet ? "FI before retirement" : fiAfterRet ? "FI after retirement" : "FI achieved";
+        chartStatus.style.color = "";
+        chartStatus.className   = "badge " + (fiAfterRet ? "badge-info" : "badge-success");
+    }
     if (btnToggleTable) btnToggleTable.style.display = 'inline-block';
 
     // Portfolio balance at the employment retirement date (for timeline)
@@ -579,8 +599,20 @@ function calculateRetirement() {
         </li>` });
     }
 
-    // Financial Independence (skip if already FI — handled in the Today/Already-FI block above)
-    if (!alreadyFI) {
+    // Financial Independence (skip if already FI — handled in the Today/Already-FI block above).
+    // If the planned retirement is too early and the portfolio runs dry, the FI
+    // milestone never actually happens on this plan — replace it with a clear
+    // "Savings Exhausted" milestone instead of an unreachable FI claim.
+    if (planDepletes) {
+        events.push({ age: result.depletionAge, html: `
+        <li class="timeline-item timeline-depleted">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>Savings Exhausted (Age ${formatNumber(result.depletionAge)})</h4>
+                <p>On your current plan — retiring at age ${formatNumber(plannedRetAge)} — the portfolio runs out here. You could afford to stop only at about age ${formatNumber(fiAge)} (a ${formatCurrency(fiPortfolio)} portfolio); retiring at ${formatNumber(plannedRetAge)} is <strong>before you can afford to</strong>. To make it work: retire later, spend less, save more, or add guaranteed income.</p>
+            </div>
+        </li>` });
+    } else if (!alreadyFI) {
         events.push({ age: fiAge, html: `
         <li class="timeline-item highlight">
             <div class="timeline-marker"></div>
@@ -632,9 +664,15 @@ function calculateRetirement() {
         </li>` });
     }
 
+    // Once the portfolio is exhausted, later milestones (pension/CPP/OAS) are
+    // meaningless on this plan — drop anything past the depletion age.
+    const visibleEvents = planDepletes
+        ? events.filter(e => e.age <= result.depletionAge + 1e-6)
+        : events;
+
     // Sort by age and render
-    events.sort((a, b) => a.age - b.age);
-    timelineList.innerHTML = events.map(e => e.html).join('');
+    visibleEvents.sort((a, b) => a.age - b.age);
+    timelineList.innerHTML = visibleEvents.map(e => e.html).join('');
 
     renderChart(main.simData, includeRetAge ? plannedRetAge : null, fiAge, benefits, isGCMode && bridgeBenefit > 0, noPen ? noPen.simData : []);
     renderDetailedTable(main.yearlyData, roiAnnual);
@@ -646,6 +684,7 @@ function calculateRetirement() {
         includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
         includeCppOas, cppAmount, cppAge, oasAmount, oasAge,
         fiAge, yearsToFI, fiPortfolio, fiPortfolioNoPension,
+        depletionAge: result.depletionAge,
         balAtEmpRet, benefits });
 }
 
@@ -1008,7 +1047,8 @@ function rptSnapshot(d) {
 
 function rptAnswer(d) {
     const { fiAge, yearsToFI, fiPortfolio, fiPortfolioNoPension,
-            expenses, includePension, swr, swrDecimal, benefits } = d;
+            expenses, includePension, swr, swrDecimal, benefits,
+            includeRetAge, plannedRetAge, depletionAge } = d;
 
     if (!fiAge) return `
         <div class="report-section">
@@ -1032,6 +1072,15 @@ function rptAnswer(d) {
         ? `<p class="report-narrative" style="font-size:0.85rem;color:var(--text-muted);"><strong>What is a "safe withdrawal rate"?</strong> It is the share of your portfolio you can spend each year — historically around ${formatNumber(swr)}% — that has let portfolios last 30+ years without running dry. At ${formatNumber(swr)}%, every ${formatCurrency(100 / swr)} of portfolio supports about ${formatCurrency(1)} of annual spending, so covering ${formatCurrency(netExp)}/yr needs roughly ${formatCurrency(netExp / swrDecimal)} set aside to cover it.</p>`
         : '';
 
+    // If the planned retirement is earlier than the FI age AND the portfolio
+    // actually runs dry, warn loudly. (Retiring a little early can still work
+    // when ROI outpaces the withdrawal rate — we only warn on real depletion.)
+    const depletionBlock = depletionAge != null
+        ? `<div class="report-warning-callout">
+                <strong>Heads up: your current plan runs out of money at about age ${formatNumber(depletionAge)}.</strong> The age above (${formatNumber(fiAge)}) is the earliest you could afford to stop working <em>if you keep working until then</em>. You have chosen to retire at age ${formatNumber(plannedRetAge)}, which is earlier — so your portfolio is drawn down faster than it can last, and it is exhausted around age ${formatNumber(depletionAge)}. To make an early exit work you would need to retire later, spend less, save more, or add guaranteed income.
+           </div>`
+        : '';
+
     const pensionBlock = includePension && fiPortfolioNoPension !== null && fiPortfolioNoPension > fiPortfolio
         ? `<div class="report-pension-callout">
                 <strong>Your DB pension reduces the portfolio you need by ${formatCurrency(fiPortfolioNoPension - fiPortfolio)}</strong> — from ${formatCurrency(fiPortfolioNoPension)} (without pension) down to ${formatCurrency(fiPortfolio)} (with pension). A guaranteed pension does the job a much larger pile of savings would otherwise have to do, which is why it is such a valuable part of your compensation as a public servant.
@@ -1049,6 +1098,7 @@ function rptAnswer(d) {
             </div>
             <p class="report-narrative"><strong>What does this mean?</strong> Financial independence is the point where you no longer <em>need</em> a paycheque. Your investment portfolio — together with any pension, CPP, OAS or other steady income — can cover your living expenses on its own, for the rest of your life. Reaching it does not mean you must stop working; it means work becomes a choice.</p>
             <p class="report-narrative">${portDesc}</p>
+            ${depletionBlock}
             ${swrExplainer}
             ${pensionBlock}
         </div>`;
@@ -1145,9 +1195,10 @@ function rptTimeline(d) {
     const { age, income, expenses, balance, fiAge, fiPortfolio, swrDecimal, swr,
             includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
             includeCppOas, cppAmount, cppAge, oasAmount, oasAge,
-            includeRetAge, plannedRetAge, balAtEmpRet, benefits } = d;
+            includeRetAge, plannedRetAge, balAtEmpRet, benefits, depletionAge } = d;
 
     if (!fiAge) return '';
+    const planDepletes = depletionAge != null;
 
     const events = [];
     const balNote = balance > 0 ? ` Portfolio: ${formatCurrency(balance)}.` : '';
@@ -1165,9 +1216,16 @@ function rptTimeline(d) {
         events.push({ age: plannedRetAge, isFI: false, title: 'Employment Retirement', body: `${prefix} ${incDesc}` });
     }
 
-    // FI description — shared single source of truth with the calculator.
-    const rptFiBody = describeFiPortfolio(fiAge, expenses, benefits, fiPortfolio, swr, swrDecimal);
-    events.push({ age: fiAge, isFI: true, title: 'Financial Independence', body: rptFiBody });
+    // FI description — shared single source of truth with the calculator. But if
+    // the planned retirement is too early and the portfolio runs dry, the FI
+    // milestone never happens on this plan — show the depletion instead.
+    if (planDepletes) {
+        events.push({ age: depletionAge, isFI: false, title: 'Savings Exhausted',
+            body: `On your current plan — retiring at age ${formatNumber(plannedRetAge)} — the portfolio runs out here. You could afford to stop only at about age ${formatNumber(fiAge)} (a ${formatCurrency(fiPortfolio)} portfolio). Retiring at ${formatNumber(plannedRetAge)} is before you can afford to: to make it work, retire later, spend less, save more, or add guaranteed income.` });
+    } else {
+        const rptFiBody = describeFiPortfolio(fiAge, expenses, benefits, fiPortfolio, swr, swrDecimal);
+        events.push({ age: fiAge, isFI: true, title: 'Financial Independence', body: rptFiBody });
+    }
 
     if (includePension && pensionAge < 999 && pensionAge > age) {
         events.push({ age: pensionAge, isFI: false, title: 'DB Pension Starts',
@@ -1185,9 +1243,11 @@ function rptTimeline(d) {
             body: describeIncomeAt(oasAge, expenses, benefits, isGCMode) });
     }
 
-    events.sort((a, b) => a.age - b.age);
+    // Nothing past the day the money runs out belongs in the story.
+    const visible = planDepletes ? events.filter(e => e.age <= depletionAge + 1e-6) : events;
+    visible.sort((a, b) => a.age - b.age);
 
-    const items = events.map(e => `
+    const items = visible.map(e => `
         <li class="report-timeline-item${e.isFI ? ' fi-item' : ''}">
             <div class="report-timeline-age">
                 <span class="age-num">${formatNumber(e.age)}</span>

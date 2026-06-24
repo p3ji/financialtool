@@ -57,9 +57,17 @@ Key exports:
 
 ### Invariants the math must uphold (enforced by `tests/run-scenarios.js`)
 
-1. **FI age does not depend on the planned retirement date.** Entering a
-   retirement date earlier than the FI date must not change the FI age (and
-   must never flip a reachable FI to "not achievable").
+1. **FI age does not depend on the planned retirement date.** The FI age is the
+   stable "earliest you could afford to stop *if you keep working until then*"
+   target. Entering a retirement date does not change it. **But** when the
+   planned retirement is earlier than the FI age, the *projection* may run the
+   portfolio dry — `analyze()` returns `depletionAge` (else `null`). The UI then
+   warns loudly (badge "Savings run out at age X", a "Savings Exhausted"
+   timeline milestone, a §2 report callout) and **hides every milestone past the
+   depletion age** (later pension/CPP/OAS milestones can't help a dead
+   portfolio). Caveat honoured: retiring a little early can still *survive* when
+   ROI > the withdrawal rate — `depletionAge` is `null` in that case, so **no
+   false warning**. Trigger off real depletion, never off "retire < FI".
 2. **Passive income is real income.** Pension/CPP/OAS/rental must show up in
    the projected income stream (graph + detailed table) at their start age;
    surplus adds to the portfolio.

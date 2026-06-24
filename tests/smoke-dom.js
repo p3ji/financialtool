@@ -104,6 +104,26 @@ for (const sc of scenarios) {
     else { console.log(`✗ not-achievable case failed (status="${status}", fiAge="${fiAgeTxt}", exhaustMilestone=${exhaustOk})`); ok = false; }
 })();
 
+// Retiring before you can afford to: the projection depletes. Badge must warn,
+// timeline must end at "Savings Exhausted" with no later (pension/CPP/OAS)
+// milestones, and there must be no phantom "Financial Independence" milestone.
+(function retireBeforeFiUI() {
+    setChk('chkIncludePension', true); setVal('pensionAge', 60); setVal('pensionAmount', 100000);
+    setChk('chkIncludeCppOas', true); setVal('cppStartAge', 65); setVal('cppAmountAt65', 14000); setVal('oasStartAge', 65); setVal('oasAmountAt65', 8500);
+    setVal('currentAge', 35); setVal('annualIncome', 90000); setVal('annualExpenses', 95000);
+    setChk('chkIncludePortfolio', true); setVal('currentBalance', 100000);
+    setChk('chkIncludeRetAge', true); setVal('plannedRetirementAge', 55);
+    const status = read('chartStatus');
+    const timeline = doc.querySelector('.timeline').textContent;
+    const badgeWarns   = /run out|runs out|run dry|exhaust/i.test(status);
+    const showsExhaust = /Savings Exhausted/.test(timeline);
+    // Match milestone TITLES only (not the benign "No pension, CPP, OAS …" body).
+    const noLateMilestones = !/Pension Starts|OAS Start|CPP Starts|Financial Independence \(Age/.test(timeline);
+    if (badgeWarns && showsExhaust && noLateMilestones)
+        console.log(`✓ retire-before-FI: badge "${status}", timeline ends at Savings Exhausted (no later milestones)`);
+    else { console.log(`✗ retire-before-FI UI (badgeWarns=${badgeWarns}, showsExhaust=${showsExhaust}, noLate=${noLateMilestones})`); ok = false; }
+})();
+
 // Portfolio-only user (no pension/CPP/OAS): the report must not claim
 // guaranteed income covers the bill or reference non-existent income sources.
 (function portfolioOnlyUI() {
