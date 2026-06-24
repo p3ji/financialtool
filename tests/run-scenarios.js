@@ -232,6 +232,132 @@ for (const ret of [40, 45, 50, 55, 60, 65]) {
 })();
 
 // ------------------------------------------------------------
+// 7. CPP / OAS start-age adjustment unit tests (exact factors)
+//    CPP: -0.6%/mo before 65, +0.7%/mo after (clamped 60–70)
+//    OAS: no early option (clamped 65), +0.6%/mo after (to 70)
+// ------------------------------------------------------------
+(function adjustments() {
+    const approx = (a, b) => Math.abs(a - b) < 0.5;
+    check('[adj] CPP at 65 = base',           approx(C.calcCppAdjusted(1000, 65), 1000));
+    check('[adj] CPP early at 60 = -36%',      approx(C.calcCppAdjusted(1000, 60), 640), C.calcCppAdjusted(1000, 60));
+    check('[adj] CPP deferred to 70 = +42%',   approx(C.calcCppAdjusted(1000, 70), 1420), C.calcCppAdjusted(1000, 70));
+    check('[adj] CPP clamped below 60',        approx(C.calcCppAdjusted(1000, 55), 640));
+    check('[adj] CPP clamped above 70',        approx(C.calcCppAdjusted(1000, 75), 1420));
+    check('[adj] OAS at 65 = base',            approx(C.calcOasAdjusted(1000, 65), 1000));
+    check('[adj] OAS has no early reduction',  approx(C.calcOasAdjusted(1000, 60), 1000));
+    check('[adj] OAS deferred to 70 = +36%',   approx(C.calcOasAdjusted(1000, 70), 1360), C.calcOasAdjusted(1000, 70));
+})();
+
+// ------------------------------------------------------------
+// 8. Deferred / early CPP+OAS run through the full engine
+// ------------------------------------------------------------
+for (const cppAge of [60, 65, 70]) {
+    for (const oasAge of [65, 70]) {
+        const cppAmount = C.calcCppAdjusted(14000, cppAge);
+        const oasAmount = C.calcOasAdjusted(8500, oasAge);
+        const r = assertInvariants(`cpp${cppAge}/oas${oasAge}`,
+            { age: 50, income: 110000, expenses: 60000, balance: 200000,
+              cppAge, cppAmount, oasAge, oasAmount });
+        // Deferred amounts must exceed the age-65 baseline.
+        if (cppAge === 70) check(`[cpp70] deferred CPP > base`, cppAmount > 14000);
+        if (cppAge === 60) check(`[cpp60] early CPP < base`,    cppAmount < 14000);
+    }
+}
+
+// ------------------------------------------------------------
+// 9. GC bridge-benefit edge ages
+// ------------------------------------------------------------
+for (const pensionAge of [55, 58, 60, 64, 65]) {
+    const p = { age: 45, income: 120000, expenses: 70000, balance: 300000,
+                pensionAge, lifetimePension: 45000, bridgeBenefit: 12000,
+                cppAge: 65, cppAmount: 14000, oasAge: 65, oasAmount: 8500 };
+    assertInvariants(`gcBridge@${pensionAge}`, p);
+    const bp = buildParams(p);
+    // Before 65 (and on/after pension start) the bridge tops up income; at 65+ it is gone.
+    if (pensionAge < 65) {
+        const incBefore = C.getRetirementIncome(Math.max(pensionAge, 60), bp.benefits);
+        const incAt65   = C.getRetirementIncome(65, bp.benefits);
+        check(`[gcBridge@${pensionAge}] bridge included before 65`,
+            incBefore >= 45000 + 12000, incBefore);
+        check(`[gcBridge@${pensionAge}] bridge dropped at 65 (pension+CPP+OAS only)`,
+            Math.abs(incAt65 - (45000 + 14000 + 8500)) < 1, incAt65);
+        // Wording must name the bridge in GC mode before 65.
+        const w = C.describeIncomeAt(Math.max(pensionAge, 60.5), 70000, bp.benefits, true);
+        check(`[gcBridge@${pensionAge}] wording mentions bridge before 65`, /bridge/i.test(w), w);
+    }
+}
+
+// ------------------------------------------------------------
+// 10. ROI / SWR extremes
+// ------------------------------------------------------------
+for (const roi of [0, 2, 8]) {
+    for (const swr of [1, 4, 10]) {
+        assertInvariants(`roi${roi}/swr${swr}`,
+            { age: 35, income: 120000, expenses: 55000, balance: 150000, roi, swr,
+              pensionAge: 60, lifetimePension: 40000 });
+    }
+}
+// Zero ROI, pure portfolio: target is exactly expenses/SWR and reachable by saving.
+(function zeroRoi() {
+    const p = buildParams({ age: 40, income: 100000, expenses: 40000, balance: 0, roi: 0, swr: 4 });
+    const r = C.analyze(p);
+    check('[zeroRoi] portfolio-only target = expenses/SWR',
+        r.fiAge !== null && Math.abs(r.fiPortfolio - 40000 / 0.04) < 1,
+        `fiPortfolio=${r.fiPortfolio}`);
+})();
+
+// ------------------------------------------------------------
+// 11. Degenerate orderings: expenses=0 and retirement-date == FI-date
+// ------------------------------------------------------------
+(function degenerate() {
+    // Expenses of 0 → already FI immediately, no NaN.
+    const z = C.analyze(buildParams({ age: 30, income: 80000, expenses: 0, balance: 0 }));
+    check('[deg] expenses=0 ⇒ already FI', z.fiMonth === 0, `fiMonth=${z.fiMonth}`);
+    check('[deg] expenses=0 ⇒ finite target', finite(z.fiPortfolio) && z.fiPortfolio === 0);
+
+    // Retirement date exactly at the FI date: still consistent, no double-counting.
+    const base = { age: 35, income: 130000, expenses: 60000, balance: 100000 };
+    const noRet = C.analyze(buildParams(base));
+    if (noRet.fiAge !== null) {
+        const atFi = C.analyze(buildParams({ ...base, includeRetAge: true, plannedRetAge: Math.round(noRet.fiAge) }));
+        check('[deg] ret date == FI date keeps same FI age',
+            atFi.fiAge !== null && Math.abs(atFi.fiAge - noRet.fiAge) < 1e-9,
+            `noRet=${noRet.fiAge} atFi=${atFi.fiAge}`);
+    }
+})();
+
+// ------------------------------------------------------------
+// 12. Wording sanity sweep: no "NaN"/"undefined" leaks into any string,
+//     and combined CPP+OAS / rental phrasing is well-formed.
+// ------------------------------------------------------------
+(function wordingSweep() {
+    const bad = s => /NaN|undefined|\$NaN|\bnull\b/.test(s);
+    let strings = 0;
+    for (const iv of incomeVsExpense) {
+        for (const src of incomeSources) {
+            const p = buildParams({ age: 45, ...iv, balance: 250000, ...src });
+            const r = C.analyze(p);
+            for (const age of [45, 55, 60, 65, 67, 70, 90]) {
+                const w = C.describeIncomeAt(age, p.expenses, p.benefits, true);
+                strings++;
+                check(`[word] clean describeIncomeAt (${src.tag}@${age})`, !bad(w), w);
+            }
+            if (r.fiAge !== null) {
+                const f = C.describeFiPortfolio(r.fiAge, p.expenses, p.benefits, r.fiPortfolio, p.swr, p.swrDecimal);
+                strings++;
+                check(`[word] clean describeFiPortfolio (${iv.tag}/${src.tag})`, !bad(f), f);
+            }
+        }
+    }
+    // Combined CPP & OAS at the same age should read as one "= $total/yr" clause.
+    const cp = buildParams({ age: 66, income: 0, expenses: 40000, balance: 0,
+                             cppAge: 65, cppAmount: 12000, oasAge: 65, oasAmount: 8000 });
+    const cw = C.describeIncomeAt(66, 40000, cp.benefits, false);
+    check('[word] CPP+OAS combined shows total', /CPP.*OAS.*=\s*\$20,000\/yr/.test(cw), cw);
+    check('[word] exercised many strings', strings > 100, `count=${strings}`);
+})();
+
+// ------------------------------------------------------------
 console.log(`\n${'='.repeat(60)}`);
 console.log(`Scenario tests: ${pass} passed, ${fail} failed`);
 if (failures.length) {
