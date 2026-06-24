@@ -19,7 +19,7 @@ const {
 // loads — this is what the test harness and a local preview use).
 // ---------------------------------------------------------------
 const SHOW_REPORT_TAB =
-    (typeof window !== 'undefined' && window.__PUBLISH_REPORT_TAB__ === true) || false;
+    (typeof window !== 'undefined' && window.__PUBLISH_REPORT_TAB__ === true) || true;
 
 const STATCAN_DATA = {
     spendingByProvince: {
