@@ -1275,6 +1275,34 @@ details[open] .assumptions-summary::before {
 }
 .report-explanation strong { color: var(--text-main); }
 
+/* Narrative overhaul: intro band + plain-language income-source list */
+.report-intro {
+    color: var(--text-muted);
+    line-height: 1.7;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--panel-border);
+}
+.report-intro strong { color: var(--text-main); }
+.report-source-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.6rem 0 0;
+    display: grid;
+    gap: 0.6rem;
+}
+.report-source-list li {
+    color: var(--text-muted);
+    line-height: 1.55;
+    font-size: 0.88rem;
+    padding: 0.7rem 0.95rem;
+    background: rgba(0,0,0,0.12);
+    border-radius: 8px;
+    border-left: 3px solid var(--accent-color);
+}
+.report-source-list strong { color: var(--text-main); }
+
 @media print {
     .top-nav, .report-header-row, .app-background, footer, #comparisonPanel, .dashboard { display: none !important; }
     #reportPanel { display: block !important; }

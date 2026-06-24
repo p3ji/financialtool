@@ -1,6 +1,25 @@
-// Formatters
-const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
-const formatNumber = (val) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(val);
+// Shared calculation engine (calc.js — loaded before this script).
+// Pulling these in keeps the dashboard and the automated test harness on
+// the exact same math and wording.
+const {
+    formatCurrency, formatNumber,
+    calcCppAdjusted, calcOasAdjusted,
+    getRetirementIncome, getRequiredBalanceAtAge,
+    describeIncomeAt, describeFiPortfolio
+} = FinCalc;
+
+// ---------------------------------------------------------------
+// Report tab gate.
+// The narrative Report tab stays UNPUBLISHED until it has been reviewed
+// and approved. While off: the nav tab is hidden and the report is not
+// rendered (so it can't leak via print either).
+//
+// To PUBLISH: change the default below to `true` (or, to preview without
+// publishing, set `window.__PUBLISH_REPORT_TAB__ = true` before app.js
+// loads — this is what the test harness and a local preview use).
+// ---------------------------------------------------------------
+const SHOW_REPORT_TAB =
+    (typeof window !== 'undefined' && window.__PUBLISH_REPORT_TAB__ === true) || true;
 
 const STATCAN_DATA = {
     spendingByProvince: {
@@ -43,22 +62,6 @@ const STATCAN_DATA = {
         "Saskatchewan": { "Single": 57900, "CoupleNoChildren": 75500, "CoupleChildren": 130800, "LoneParent": 75500 }
     }
 };
-
-// CPP & OAS adjustment helpers
-function calcCppAdjusted(baseAmount, startAge) {
-    const clampedAge = Math.min(Math.max(startAge, 60), 70);
-    const monthsFromStd = (clampedAge - 65) * 12;
-    if (monthsFromStd < 0) return baseAmount * (1 + 0.006 * monthsFromStd);
-    if (monthsFromStd > 0) return baseAmount * (1 + 0.007 * monthsFromStd);
-    return baseAmount;
-}
-
-function calcOasAdjusted(baseAmount, startAge) {
-    const clampedAge = Math.min(Math.max(startAge, 65), 70);
-    const monthsFromStd = (clampedAge - 65) * 12;
-    if (monthsFromStd <= 0) return baseAmount;
-    return baseAmount * (1 + 0.006 * monthsFromStd);
-}
 
 // DOM Elements
 const inputs = {
@@ -262,74 +265,6 @@ calculateRetirement();
 // Core calculation engine
 // -------------------------------------------------------------------
 
-/**
- * Returns the portfolio balance required to be financially independent at `currentAge`.
- * Works backward via present-value from the "terminal age" (last income transition).
- *
- * benefits = { pensionAge, lifetimePension, bridgeBenefit, cppAge, cppAmount, oasAge, oasAmount }
- * Use 999 as sentinel for disabled income sources.
- */
-function getRequiredBalanceAtAge(currentAge, expenses, swrDecimal, rMonthly, benefits) {
-    const {
-        pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0,
-        cppAge = 999, cppAmount = 0,
-        oasAge = 999, oasAmount = 0,
-        rentalIncome = 0
-    } = benefits || {};
-
-    const terminalIncome = (pensionAge < 999 ? lifetimePension : 0) +
-                           (cppAge   < 999 ? cppAmount         : 0) +
-                           (oasAge   < 999 ? oasAmount         : 0) +
-                           rentalIncome;
-    const terminalPortfolio = Math.max(0, expenses - terminalIncome) / swrDecimal;
-
-    const transitionAges = [];
-    if (pensionAge < 999) {
-        transitionAges.push(pensionAge);
-        if (bridgeBenefit > 0 && pensionAge < 65) transitionAges.push(65);
-    }
-    if (cppAge < 999) transitionAges.push(cppAge);
-    if (oasAge < 999) transitionAges.push(oasAge);
-
-    if (transitionAges.length === 0) return terminalPortfolio;
-
-    const terminalAge = Math.max(...transitionAges);
-    if (currentAge >= terminalAge) return terminalPortfolio;
-
-    const monthsToTerminal = Math.ceil((terminalAge - currentAge) * 12);
-    let req = terminalPortfolio;
-
-    for (let i = 1; i <= monthsToTerminal; i++) {
-        const ageAtStep = terminalAge - (i / 12);
-        let income = 0;
-        if (pensionAge < 999 && ageAtStep >= pensionAge) {
-            income += lifetimePension;
-            if (ageAtStep < 65) income += bridgeBenefit;
-        }
-        if (cppAge < 999 && ageAtStep >= cppAge) income += cppAmount;
-        if (oasAge < 999 && ageAtStep >= oasAge) income += oasAmount;
-        income += rentalIncome;
-        req = (req + Math.max(0, expenses - income) / 12) / (1 + rMonthly);
-    }
-
-    return req;
-}
-
-// Returns all passive retirement income active at a given age (pension + CPP + OAS + rental)
-function getRetirementIncome(age, benefits) {
-    const { pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0,
-            cppAge = 999, cppAmount = 0, oasAge = 999, oasAmount = 0, rentalIncome = 0 } = benefits;
-    let income = 0;
-    if (pensionAge < 999 && age >= pensionAge) {
-        income += lifetimePension;
-        if (age < 65) income += bridgeBenefit;
-    }
-    if (cppAge < 999 && age >= cppAge) income += cppAmount;
-    if (oasAge < 999 && age >= oasAge) income += oasAmount;
-    income += rentalIncome;
-    return income;
-}
-
 function updateAdjustmentNote(elementId, base, adjusted, startAge) {
     const el = document.getElementById(elementId);
     if (!el) return;
@@ -346,43 +281,6 @@ function updateAdjustmentNote(elementId, base, adjusted, startAge) {
         el.textContent = `Deferred: +${pct}% → ${formatCurrency(adjusted)}/yr at age ${startAge}`;
         el.className = 'benefit-adj-note adj-bonus';
     }
-}
-
-// Returns a complete description of all active income sources at a given age
-// and how much the portfolio must cover. Used by all timeline milestones.
-function describeIncomeAt(age, expenses, benefits, gcMode) {
-    const { pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0,
-            cppAge = 999, cppAmount = 0, oasAge = 999, oasAmount = 0, rentalIncome = 0 } = benefits;
-
-    const parts = [];
-    if (pensionAge < 999 && age >= pensionAge) {
-        if (gcMode && bridgeBenefit > 0) {
-            if (age < 65) {
-                parts.push(`DB Pension: ${formatCurrency(lifetimePension + bridgeBenefit)}/yr (${formatCurrency(lifetimePension)} lifetime + ${formatCurrency(bridgeBenefit)} bridge, ends at 65)`);
-            } else {
-                parts.push(`DB Pension: ${formatCurrency(lifetimePension)}/yr (lifetime only — bridge ended at 65)`);
-            }
-        } else {
-            parts.push(`DB Pension: ${formatCurrency(lifetimePension)}/yr`);
-        }
-    }
-    if (cppAge < 999 && age >= cppAge) parts.push(`CPP: ${formatCurrency(cppAmount)}/yr`);
-    if (oasAge < 999 && age >= oasAge) parts.push(`OAS: ${formatCurrency(oasAmount)}/yr`);
-    if (rentalIncome > 0)              parts.push(`Rental: ${formatCurrency(rentalIncome)}/yr`);
-
-    const totalIncome = getRetirementIncome(age, benefits);
-    const gap = Math.max(0, expenses - totalIncome);
-
-    if (parts.length === 0) {
-        return `No passive income active — portfolio draws down to fund all ${formatCurrency(expenses)}/yr in expenses.`;
-    }
-
-    const joined   = parts.join(' + ');
-    const totalStr = parts.length > 1 ? ` = ${formatCurrency(totalIncome)}/yr` : '';
-
-    return gap === 0
-        ? `${joined}${totalStr} — fully covers ${formatCurrency(expenses)}/yr in expenses.`
-        : `${joined}${totalStr}. Portfolio draws the remaining ${formatCurrency(gap)}/yr.`;
 }
 
 function calculateRetirement() {
@@ -478,107 +376,20 @@ function calculateRetirement() {
         return;
     }
 
-    const maxMonths = (100 - age) * 12;
-    // Month at which employment income stops
-    const monthsToEmpStop = Math.max(0, Math.round((plannedRetAge - age) * 12));
-
     // -------------------------------------------------------------------
-    // Single combined simulation pass: FI detection + chart/table data
-    // Both "with pension" and "no pension" use the SAME employment retirement
-    // age, so they accumulate identically and only diverge after that date.
+    // Run the shared engine. analyze() detects FI from a retirement-date-
+    // independent accumulation pass, then projects the chart/table using the
+    // chosen retirement date. Passive income (pension/CPP/OAS/rental) is
+    // credited whenever active; surplus reinvests into the portfolio.
     // -------------------------------------------------------------------
-
-    function runSimulation(benfts) {
-        let bal = balance;
-        let fiMonth = null;
-        const simData = [];
-        const yearlyData = [];
-
-        let sumIncome = 0, sumExpenses = 0, sumROI = 0;
-        let startBalOfYear = balance;
-        let currentYearAge = Math.floor(age);
-        let isFIYear = false, isEmpRetYear = false;
-        let isPensionYear = false, isCppYear = false, isOasYear = false;
-
-        // Year 0 row (opening snapshot)
-        yearlyData.push({
-            age: currentYearAge, income: 0, expenses: 0, roi: 0,
-            percentCovered: 0, changeInNetworth: 0, networth: balance,
-            isFIYear: false, isEmpRetYear: false,
-            isPensionYear: false, isCppYear: false, isOasYear: false
-        });
-        currentYearAge++;
-
-        for (let m = 0; m <= maxMonths; m++) {
-            const currentAge = age + m / 12;
-            const isWorking  = m < monthsToEmpStop;
-
-            // Key chart points: yearly + transitions
-            if (m % 12 === 0 ||
-                m === monthsToEmpStop ||
-                (benfts.pensionAge < 999 && Math.abs(currentAge - benfts.pensionAge) < 0.05) ||
-                (benfts.cppAge     < 999 && Math.abs(currentAge - benfts.cppAge)     < 0.05) ||
-                (benfts.oasAge     < 999 && Math.abs(currentAge - benfts.oasAge)     < 0.05) ||
-                Math.abs(currentAge - 65) < 0.05) {
-                simData.push({ x: currentAge, y: bal });
-            }
-
-            // FI check
-            const required = getRequiredBalanceAtAge(currentAge, expenses, swrDecimal, rMonthly, benfts);
-            if (fiMonth === null && bal >= required) {
-                fiMonth = m;
-                isFIYear = true;
-                simData.push({ x: currentAge, y: bal }); // ensure FI point is on chart
-            }
-
-            // Transition markers for table
-            if (m === monthsToEmpStop) isEmpRetYear = true;
-            if (benfts.pensionAge < 999 && currentAge >= benfts.pensionAge && currentAge - 1/12 < benfts.pensionAge) isPensionYear = true;
-            if (benfts.cppAge     < 999 && currentAge >= benfts.cppAge     && currentAge - 1/12 < benfts.cppAge)     isCppYear    = true;
-            if (benfts.oasAge     < 999 && currentAge >= benfts.oasAge     && currentAge - 1/12 < benfts.oasAge)     isOasYear    = true;
-
-            // Monthly income for table (all amounts are monthly)
-            const monthlyPassiveIncome = isWorking ? 0 : (getRetirementIncome(currentAge, benfts) / 12);
-            const monthlyEmpIncome     = isWorking ? (income / 12) : 0;
-            const monthlyIncome        = monthlyEmpIncome + monthlyPassiveIncome;
-            const monthlyROI           = bal * rMonthly;
-            sumROI      += monthlyROI;
-            sumIncome   += monthlyIncome;
-            sumExpenses += expenses / 12;
-
-            // Balance step
-            if (isWorking) {
-                bal = bal * (1 + rMonthly) + savings / 12;
-            } else {
-                const passiveIncome = getRetirementIncome(currentAge, benfts);
-                bal = bal * (1 + rMonthly) - Math.max(0, expenses - passiveIncome) / 12;
-            }
-
-            // End-of-year aggregation
-            const isEndOfYear = (m + 1) % 12 === 0;
-            if (isEndOfYear || m === maxMonths) {
-                yearlyData.push({
-                    age: currentYearAge,
-                    income: sumIncome,
-                    expenses: sumExpenses,
-                    roi: sumROI,
-                    percentCovered: sumExpenses > 0 ? (sumROI / sumExpenses) * 100 : 0,
-                    changeInNetworth: bal - startBalOfYear,
-                    networth: bal,
-                    isFIYear, isEmpRetYear, isPensionYear, isCppYear, isOasYear
-                });
-                currentYearAge++;
-                sumIncome = sumExpenses = sumROI = 0;
-                startBalOfYear = bal;
-                isFIYear = isEmpRetYear = isPensionYear = isCppYear = isOasYear = false;
-            }
-        }
-
-        return { fiMonth, simData, yearlyData };
-    }
-
-    const main   = runSimulation(benefits);
-    const noPen  = includePension ? runSimulation(benefitsNoPension) : null;
+    const engineParams = {
+        age, plannedRetAge, includeRetAge, balance, income, expenses,
+        roiAnnual, swr, rMonthly, swrDecimal,
+        benefits, includePension, benefitsNoPension
+    };
+    const result = FinCalc.analyze(engineParams);
+    const main  = { fiMonth: result.fiMonth, simData: result.simData, yearlyData: result.yearlyData };
+    const noPen = includePension ? { simData: result.noPenSimData } : null;
 
     const btnToggleTable         = document.getElementById('btnToggleTable');
     const detailedTableContainer = document.getElementById('detailedTableContainer');
@@ -600,11 +411,7 @@ function calculateRetirement() {
         renderChart(main.simData, includeRetAge ? plannedRetAge : null, null, benefits, isGCMode && bridgeBenefit > 0, noPen ? noPen.simData : []);
 
         // Show partial timeline — FI not reached, but income milestones still relevant
-        const balAtEmpRetPartial = (() => {
-            let b = balance;
-            for (let m = 0; m < monthsToEmpStop; m++) b = b * (1 + rMonthly) + savings / 12;
-            return b;
-        })();
+        const balAtEmpRetPartial = result.balAtEmpRet;
         const partialEvents = [];
         partialEvents.push({ age, html: `
         <li class="timeline-item">
@@ -670,14 +477,11 @@ function calculateRetirement() {
         return;
     }
 
-    const yearsToFI  = main.fiMonth / 12;
-    const fiAge      = age + yearsToFI;
-    const fiPortfolio = getRequiredBalanceAtAge(fiAge, expenses, swrDecimal, rMonthly, benefits);
-
+    const yearsToFI          = result.yearsToFI;
+    const fiAge              = result.fiAge;
+    const fiPortfolio        = result.fiPortfolio;
     // "No pension" FI portfolio (for split row comparison)
-    const fiPortfolioNoPension = noPen
-        ? getRequiredBalanceAtAge(fiAge, expenses, swrDecimal, rMonthly, benefitsNoPension)
-        : null;
+    const fiPortfolioNoPension = result.fiPortfolioNoPension;
 
     // -------------------------------------------------------------------
     // Update Results UI
@@ -707,46 +511,16 @@ function calculateRetirement() {
     if (btnToggleTable) btnToggleTable.style.display = 'inline-block';
 
     // Portfolio balance at the employment retirement date (for timeline)
-    const balAtEmpRet = (() => {
-        let b = balance;
-        for (let m = 0; m < monthsToEmpStop; m++) b = b * (1 + rMonthly) + savings / 12;
-        return b;
-    })();
+    const balAtEmpRet = result.balAtEmpRet;
 
     // -------------------------------------------------------------------
     // Timeline — built dynamically and sorted chronologically
     // -------------------------------------------------------------------
     timelinePanel.style.display = "block";
 
-    const netExpAtFI = Math.max(0, expenses - getRetirementIncome(fiAge, benefits));
-
-    // Determine whether all income sources are active by FI age (needed to pick correct wording)
-    const fiTransitionAges = [];
-    if (pensionAge < 999) {
-        fiTransitionAges.push(pensionAge);
-        if (bridgeBenefit > 0 && pensionAge < 65) fiTransitionAges.push(65);
-    }
-    if (cppAge < 999) fiTransitionAges.push(cppAge);
-    if (oasAge < 999) fiTransitionAges.push(oasAge);
-    const fiTerminalAge = fiTransitionAges.length > 0 ? Math.max(...fiTransitionAges) : 0;
-    const allSourcesActiveAtFI = fiTerminalAge === 0 || fiAge >= fiTerminalAge;
-
-    const terminalIncome = (pensionAge < 999 ? lifetimePension : 0) +
-                           (cppAge    < 999 ? cppAmount        : 0) +
-                           (oasAge    < 999 ? oasAmount        : 0) +
-                           rentalIncome;
-    const terminalGap = Math.max(0, expenses - terminalIncome);
-
-    let fiDesc;
-    if (netExpAtFI === 0) {
-        fiDesc = `Income sources fully cover all expenses at this age — no portfolio drawdown needed.`;
-    } else if (allSourcesActiveAtFI) {
-        fiDesc = `Portfolio generates ${formatCurrency(fiPortfolio * swrDecimal)}/yr at ${swr}% SWR to cover the ${formatCurrency(netExpAtFI)}/yr gap after income sources.`;
-    } else {
-        fiDesc = terminalGap <= 0
-            ? `Portfolio of ${formatCurrency(fiPortfolio)} bridges all expenses until income sources take over completely.`
-            : `Portfolio of ${formatCurrency(fiPortfolio)} bridges expenses to your income sources, then sustains a ${formatCurrency(terminalGap)}/yr drawdown at ${swr}% SWR.`;
-    }
+    // Single source of truth for the FI-portfolio narrative (shared with the
+    // report tab) — correctly distinguishes steady-SWR vs. bridge regimes.
+    const fiDesc = describeFiPortfolio(fiAge, expenses, benefits, fiPortfolio, swr, swrDecimal);
 
     // Collect events — each has a sort key (age) and an HTML string
     const events = [];
@@ -776,8 +550,6 @@ function calculateRetirement() {
     // Employment Retirement (only if user added it and it differs meaningfully from FI)
     if (includeRetAge && Math.abs(plannedRetAge - fiAge) > 0.1) {
         const isAlreadyFI   = plannedRetAge > fiAge;
-        const passiveAtRet  = getRetirementIncome(plannedRetAge, benefits);
-        const gapAtRet      = Math.max(0, expenses - passiveAtRet);
         let retMsg;
         const incomeDescAtRet = describeIncomeAt(plannedRetAge, expenses, benefits, isGCMode);
         if (isAlreadyFI) {
@@ -1071,16 +843,23 @@ function updateDemographicBenchmarks() {
     const incomeDiff    = userIncome - benchIncome;
     const incomePercent = benchIncome > 0 ? (incomeDiff / benchIncome) * 100 : 0;
     const incomeBadge   = document.getElementById('incomeBadge');
-    if (incomeDiff >= 0) {
-        incomeBadge.textContent = `+${formatNumber(Math.abs(incomePercent))}% vs benchmark`;
-        incomeBadge.className   = "badge badge-success";
-    } else {
-        incomeBadge.textContent = `-${formatNumber(Math.abs(incomePercent))}% vs benchmark`;
-        incomeBadge.className   = "badge badge-danger";
-    }
-
     const incomeNarrative = document.getElementById('incomeNarrative');
-    incomeNarrative.innerHTML = `Your annual post-tax income (${formatCurrency(userIncome)}) is <strong>${formatCurrency(Math.abs(incomeDiff))} ${incomeDiff >= 0 ? 'higher' : 'lower'}</strong> than the median after-tax income for a <strong>${householdLabelMap[household]} in ${province}</strong> (${formatCurrency(benchIncome)}) (source: Canadian Income Survey).`;
+    if (userIncome <= 0) {
+        // No employment income entered — a "−100% vs benchmark" badge would be
+        // misleading (e.g. an already-retired user living on a pension).
+        incomeBadge.textContent = 'No income entered';
+        incomeBadge.className   = 'badge';
+        incomeNarrative.innerHTML = `No employment income entered. Enter your annual after-tax income on the calculator to compare it against the median for a <strong>${householdLabelMap[household]} in ${province}</strong> (${formatCurrency(benchIncome)}, source: Canadian Income Survey).`;
+    } else {
+        if (incomeDiff >= 0) {
+            incomeBadge.textContent = `+${formatNumber(Math.abs(incomePercent))}% vs benchmark`;
+            incomeBadge.className   = "badge badge-success";
+        } else {
+            incomeBadge.textContent = `-${formatNumber(Math.abs(incomePercent))}% vs benchmark`;
+            incomeBadge.className   = "badge badge-danger";
+        }
+        incomeNarrative.innerHTML = `Your annual post-tax income (${formatCurrency(userIncome)}) is <strong>${formatCurrency(Math.abs(incomeDiff))} ${incomeDiff >= 0 ? 'higher' : 'lower'}</strong> than the median after-tax income for a <strong>${householdLabelMap[household]} in ${province}</strong> (${formatCurrency(benchIncome)}) (source: Canadian Income Survey).`;
+    }
 
     const expDiffHousehold    = userExpenses - benchExpHousehold;
     const expPercentHousehold = benchExpHousehold > 0 ? (expDiffHousehold / benchExpHousehold) * 100 : 0;
@@ -1110,9 +889,10 @@ function updateDemographicBenchmarks() {
 // ============================================================
 
 function renderReport(data) {
-    lastReportData = data;
     const panel = document.getElementById('reportPanel');
     if (!panel) return;
+    if (!SHOW_REPORT_TAB) { panel.innerHTML = ''; lastReportData = null; return; }
+    lastReportData = data;
     const province  = document.getElementById('demoProvince')?.value  || 'Canada';
     const household = document.getElementById('demoHousehold')?.value || 'CoupleNoChildren';
     panel.innerHTML = buildReportHTML(data, province, household);
@@ -1131,6 +911,7 @@ function buildReportHTML(data, province, household) {
                 </div>
                 <button class="report-print-btn" onclick="window.print()">Print / Save PDF</button>
             </div>
+            <p class="report-intro">This report turns the numbers from the calculator into plain English. It walks through <strong>where you stand today</strong>, <strong>when you could stop needing a paycheque</strong>, <strong>where your money will come from</strong> in retirement, and <strong>how you compare</strong> to other Canadians. No financial background needed — every term is explained as it comes up. For the formulas and data sources behind it, see the <a href="methodology.html" style="color:var(--accent-color);">methodology</a>.</p>
             ${rptSnapshot(data)}
             ${rptAnswer(data)}
             ${fiAge ? rptIncome(data) : ''}
@@ -1166,34 +947,50 @@ function rptSnapshot(d) {
             includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
             includeCppOas, cppAmount, cppAge, oasAmount, oasAge, rentalIncome } = d;
 
-    const incText = income > 0
-        ? `earning <strong>${formatCurrency(income)}/yr</strong> after tax`
-        : 'no employment income entered';
-    const savText = income > 0 && expenses > 0
-        ? ` Savings rate: <strong>${formatNumber(savingsRate)}%</strong> (${formatCurrency(savings)}/yr).`
-        : '';
-    const balText = balance > 0
-        ? `Current portfolio: <strong>${formatCurrency(balance)}</strong>.`
-        : 'No current portfolio balance entered.';
+    // A plain-language story of the numbers rather than a label/value dump.
+    const earnSpend = income > 0
+        ? `You earn <strong>${formatCurrency(income)} a year</strong> after tax and spend about <strong>${formatCurrency(expenses)}</strong>, `
+        : `You have not entered any employment income, and you spend about <strong>${formatCurrency(expenses)} a year</strong>. `;
 
-    const sources = [];
+    let saveStory = '';
+    if (income > 0) {
+        if (savings > 0) {
+            saveStory = `which means you put away <strong>${formatCurrency(savings)} a year</strong> — roughly <strong>${formatNumber(savingsRate)} cents of every dollar</strong> you take home. That savings rate is the single biggest lever on when you become financially independent: the more of each paycheque you keep and invest, the sooner those investments can support you instead of your job.`;
+        } else if (savings === 0) {
+            saveStory = `which means that right now you spend everything you earn. Financial independence really gets going once you find even a small, regular surplus to invest.`;
+        } else {
+            saveStory = `which means you currently spend <strong>${formatCurrency(-savings)} more than you earn</strong> each year. Closing that gap — or leaning on guaranteed income such as a pension — is what makes early independence possible.`;
+        }
+    }
+
+    const balStory = balance > 0
+        ? `You have already built an investment portfolio worth <strong>${formatCurrency(balance)}</strong>. Think of a portfolio as a money-making machine: invested sensibly, it grows on its own and will eventually pay you an income without you lifting a finger.`
+        : `You have not entered an investment portfolio yet. A "portfolio" is simply the pool of invested savings that one day pays you an income in place of a job — it is the engine this whole plan is built around.`;
+
+    // Future income sources, each with a one-line plain explanation, because a
+    // reader new to this may not know what a DB pension, CPP or OAS actually is.
+    const sourceLines = [];
     if (includePension) {
         const total = lifetimePension + bridgeBenefit;
-        const label = isGCMode ? 'MyGCPension' : 'DB Pension';
-        sources.push(`${label}: <strong>${formatCurrency(total)}/yr</strong> at age ${formatNumber(pensionAge)}`
-            + (isGCMode && bridgeBenefit > 0 ? ` (${formatCurrency(bridgeBenefit)} bridge ends at 65)` : ''));
+        const label = isGCMode ? 'your government (MyGCPension) defined-benefit pension' : 'your defined-benefit (DB) pension';
+        sourceLines.push(`<li><strong>${formatCurrency(total)}/yr from ${label}</strong>, beginning at age ${formatNumber(pensionAge)}. A defined-benefit pension is a guaranteed paycheque for life that your employer funds — income you never had to save for yourself${isGCMode && bridgeBenefit > 0 ? `. Part of it (a ${formatCurrency(bridgeBenefit)}/yr "bridge") tops you up until 65, then stops once CPP and OAS take over` : ''}.</li>`);
     }
-    if (includeCppOas && cppAmount > 0) sources.push(`CPP: <strong>${formatCurrency(cppAmount)}/yr</strong> at age ${cppAge}`);
-    if (includeCppOas && oasAmount > 0) sources.push(`OAS: <strong>${formatCurrency(oasAmount)}/yr</strong> at age ${oasAge}`);
-    if (rentalIncome > 0) sources.push(`Rental income: <strong>${formatCurrency(rentalIncome)}/yr</strong>`);
+    if (includeCppOas && cppAmount > 0) sourceLines.push(`<li><strong>${formatCurrency(cppAmount)}/yr from CPP</strong>, starting at age ${cppAge}. The Canada Pension Plan pays you back, as a monthly cheque for life, for the contributions taken off your paycheques during your working years.</li>`);
+    if (includeCppOas && oasAmount > 0) sourceLines.push(`<li><strong>${formatCurrency(oasAmount)}/yr from OAS</strong>, starting at age ${oasAge}. Old Age Security is a pension most Canadians receive from the government starting around 65, paid out of general taxes rather than your own contributions.</li>`);
+    if (rentalIncome > 0) sourceLines.push(`<li><strong>${formatCurrency(rentalIncome)}/yr in rental income</strong> from property you own — income that arrives whether or not you are working.</li>`);
+
+    const sourcesBlock = sourceLines.length
+        ? `<p class="report-narrative">On top of your own savings, you can count on these guaranteed income streams later in life:</p>
+           <ul class="report-source-list">${sourceLines.join('')}</ul>`
+        : `<p class="report-narrative">You have not added a pension, CPP or OAS. That is fine — this report will show what your portfolio needs to do on its own. Adding those sources on the Calculator tab will show how much they shorten the journey.</p>`;
 
     return `
         <div class="report-section">
             <div class="report-section-label">Section 1</div>
-            <h2>Your Financial Snapshot</h2>
-            <p class="report-narrative">Age <strong>${formatNumber(age)}</strong> — ${incText}, with <strong>${formatCurrency(expenses)}/yr</strong> in annual expenses.${savText}</p>
-            <p class="report-narrative">${balText}</p>
-            ${sources.length ? `<p class="report-narrative">Retirement income sources: ${sources.join(' &nbsp;·&nbsp; ')}.</p>` : ''}
+            <h2>Where You Stand Today</h2>
+            <p class="report-narrative">You are <strong>${formatNumber(age)} years old</strong>. ${earnSpend}${saveStory}</p>
+            <p class="report-narrative">${balStory}</p>
+            ${sourcesBlock}
         </div>`;
 }
 
@@ -1210,13 +1007,22 @@ function rptAnswer(d) {
 
     const fiYear = new Date().getFullYear() + Math.round(yearsToFI);
     const netExp = Math.max(0, expenses - getRetirementIncome(fiAge, benefits));
-    const portDesc = netExp === 0
-        ? `Your passive income sources fully cover your <strong>${formatCurrency(expenses)}/yr</strong> in expenses — no portfolio drawdown is needed.`
-        : `Your portfolio needs to reach <strong>${formatCurrency(fiPortfolio)}</strong>, which at a <strong>${formatNumber(swr)}% safe withdrawal rate</strong> generates <strong>${formatCurrency(fiPortfolio * swrDecimal)}/yr</strong> — covering the ${formatCurrency(netExp)}/yr not met by other income sources.`;
+
+    // Correct, plain-language description of what the portfolio does at FI —
+    // shared with the calculator so the two views never contradict. It picks
+    // the right wording for the "steady withdrawal" vs. "bridge until your
+    // pension/CPP/OAS start" situations.
+    const portDesc = describeFiPortfolio(fiAge, expenses, benefits, fiPortfolio, swr, swrDecimal);
+
+    // The report is written for readers with little financial background, so
+    // explain the safe-withdrawal-rate concept rather than assume it.
+    const swrExplainer = netExp > 0
+        ? `<p class="report-narrative" style="font-size:0.85rem;color:var(--text-muted);"><strong>What is a "safe withdrawal rate"?</strong> It is the share of your portfolio you can spend each year — historically around ${formatNumber(swr)}% — that has let portfolios last 30+ years without running dry. At ${formatNumber(swr)}%, every ${formatCurrency(100 / swr)} of portfolio supports about ${formatCurrency(1)} of annual spending, so covering ${formatCurrency(netExp)}/yr needs roughly ${formatCurrency(netExp / swrDecimal)} set aside for that gap.</p>`
+        : '';
 
     const pensionBlock = includePension && fiPortfolioNoPension !== null && fiPortfolioNoPension > fiPortfolio
         ? `<div class="report-pension-callout">
-                <strong>Your DB pension reduces the portfolio you need by ${formatCurrency(fiPortfolioNoPension - fiPortfolio)}</strong> — from ${formatCurrency(fiPortfolioNoPension)} (without pension) down to ${formatCurrency(fiPortfolio)} (with pension). That difference is built into your compensation as a public servant.
+                <strong>Your DB pension reduces the portfolio you need by ${formatCurrency(fiPortfolioNoPension - fiPortfolio)}</strong> — from ${formatCurrency(fiPortfolioNoPension)} (without pension) down to ${formatCurrency(fiPortfolio)} (with pension). A guaranteed pension does the job a much larger pile of savings would otherwise have to do, which is why it is such a valuable part of your compensation as a public servant.
            </div>`
         : '';
 
@@ -1229,8 +1035,9 @@ function rptAnswer(d) {
                 <div class="fi-age">${formatNumber(fiAge)}</div>
                 <div class="fi-sub">${formatNumber(yearsToFI)} years from now &nbsp;·&nbsp; ~${fiYear}</div>
             </div>
-            <p class="report-narrative"><strong>What does this mean?</strong> Financial independence means your investment portfolio — combined with any pension, CPP, OAS, or other passive income — generates enough to cover your living expenses indefinitely without needing employment income.</p>
+            <p class="report-narrative"><strong>What does this mean?</strong> Financial independence is the point where you no longer <em>need</em> a paycheque. Your investment portfolio — together with any pension, CPP, OAS or other steady income — can cover your living expenses on its own, for the rest of your life. Reaching it does not mean you must stop working; it means work becomes a choice.</p>
             <p class="report-narrative">${portDesc}</p>
+            ${swrExplainer}
             ${pensionBlock}
         </div>`;
 }
@@ -1238,7 +1045,7 @@ function rptAnswer(d) {
 function rptIncome(d) {
     const { fiAge, expenses, includePension, isGCMode, pensionAge, lifetimePension,
             bridgeBenefit, includeCppOas, cppAmount, cppAge, oasAmount, oasAge,
-            rentalIncome, swr, fiPortfolio } = d;
+            rentalIncome, swr, swrDecimal, fiPortfolio } = d;
 
     const rows = [];
     if (includePension && pensionAge < 999) {
@@ -1262,6 +1069,14 @@ function rptIncome(d) {
 
     const totalPassive = rows.filter(r => !r.pending).reduce((s, r) => s + r.amount, 0);
     const draw = Math.max(0, expenses - totalPassive);
+    const anyPending = rows.some(r => r.pending);
+
+    // Bridge vs. steady state: if the withdrawal needed at FI is far more than a
+    // steady SWR on the FI portfolio could sustain, the portfolio is BRIDGING
+    // (temporarily spending principal until your income sources switch on) — it
+    // is NOT a permanent SWR draw. Detect numerically so the wording is honest.
+    const steadyDraw = fiPortfolio * swrDecimal;
+    const isBridge   = draw > steadyDraw + 1;
 
     const rowsHTML = rows.map(r => `
         <tr${r.pending ? ' class="pending-row"' : ''}>
@@ -1270,18 +1085,31 @@ function rptIncome(d) {
             <td>${r.pending ? '<em style="font-size:0.8rem;color:var(--text-muted);">not yet active</em>' : formatCurrency(r.amount) + '/yr'}</td>
         </tr>`).join('');
 
-    const portRow = draw > 0
-        ? `<tr class="portfolio-row"><td>Portfolio withdrawal (${formatNumber(swr)}% SWR)</td><td style="color:var(--text-muted);font-size:0.83rem;">From ${formatCurrency(fiPortfolio)} portfolio at FI</td><td>${formatCurrency(draw)}/yr</td></tr>`
-        : `<tr class="portfolio-row"><td colspan="2" style="color:var(--text-muted);">Portfolio — no drawdown needed</td><td>$0/yr</td></tr>`;
+    let portRow, coverNote;
+    if (draw === 0) {
+        portRow = `<tr class="portfolio-row"><td colspan="2" style="color:var(--text-muted);">Portfolio — no withdrawal needed</td><td>$0/yr</td></tr>`;
+        coverNote = `At age ${formatNumber(fiAge)}, your guaranteed income alone fully covers your ${formatCurrency(expenses)}/yr of expenses — your portfolio can keep growing untouched, a comfortable cushion against surprises.`;
+    } else if (isBridge) {
+        // FI reached before income sources begin — portfolio temporarily funds (most of) the bill.
+        portRow = `<tr class="portfolio-row"><td>Portfolio (bridge)</td><td style="color:var(--text-muted);font-size:0.83rem;">Spends down ${formatCurrency(fiPortfolio)} until your income starts</td><td>${formatCurrency(draw)}/yr</td></tr>`;
+        coverNote = totalPassive === 0
+            ? `Notice that at age ${formatNumber(fiAge)} <strong>none of your guaranteed income has started yet</strong> — so for now your portfolio covers the full ${formatCurrency(expenses)}/yr. This is a short <strong>bridge</strong>, not a forever withdrawal: your ${formatCurrency(fiPortfolio)} is meant to be spent down over these few years until your pension/CPP/OAS switch on and take over. That is exactly why this FI portfolio can look small — it only has to last until your income arrives.`
+            : `At age ${formatNumber(fiAge)} your guaranteed income has only partly started, so your portfolio <strong>bridges</strong> the remaining ${formatCurrency(draw)}/yr by spending down principal until your other income sources begin — after which your own withdrawals drop sharply.`;
+    } else {
+        // Steady state: all income active, portfolio sustainably covers the gap at SWR.
+        portRow = `<tr class="portfolio-row"><td>Portfolio withdrawal (${formatNumber(swr)}% a year)</td><td style="color:var(--text-muted);font-size:0.83rem;">From your ${formatCurrency(fiPortfolio)} portfolio</td><td>${formatCurrency(draw)}/yr</td></tr>`;
+        coverNote = `At age ${formatNumber(fiAge)}, your guaranteed income covers most of the bill and your portfolio quietly tops up the remaining <strong>${formatCurrency(draw)}/yr</strong>. You never sell everything at once — you withdraw only that gap each year (about ${formatNumber(swr)}% of the portfolio) while the rest stays invested and keeps growing.`;
+    }
 
-    const coverNote = draw === 0
-        ? `At age ${formatNumber(fiAge)}, your passive income fully covers your ${formatCurrency(expenses)}/yr in expenses — no portfolio withdrawals required.`
-        : `At age ${formatNumber(fiAge)}, the portfolio covers the ${formatCurrency(draw)}/yr gap between your expenses and your active income sources.`;
+    const pendingNote = anyPending && !isBridge
+        ? `<p class="report-narrative">Some of your income (marked <em>not yet active</em>) does not start until later. In the early years your portfolio shoulders more of the load, and as each pension or benefit switches on, the amount you withdraw drops. The plan already accounts for this.</p>`
+        : '';
 
     return `
         <div class="report-section">
             <div class="report-section-label">Section 3</div>
-            <h2>Retirement Income at FI (Age ${formatNumber(fiAge)})</h2>
+            <h2>Where Your Money Will Come From</h2>
+            <p class="report-narrative">Once you stop working, your income arrives in <strong>layers</strong>. Guaranteed cheques — a pension, CPP, OAS — come in first. Whatever they don't cover, your portfolio fills by selling a small slice each year. Here is how those layers stack up at the age you reach financial independence:</p>
             <table class="report-income-table">
                 <thead><tr><th>Income Source</th><th>Timing</th><th style="text-align:right;">Annual Amount</th></tr></thead>
                 <tbody>
@@ -1291,6 +1119,7 @@ function rptIncome(d) {
                 </tbody>
             </table>
             <p class="report-narrative">${coverNote}</p>
+            ${pendingNote}
         </div>`;
 }
 
@@ -1304,7 +1133,10 @@ function rptTimeline(d) {
 
     const events = [];
     const balNote = balance > 0 ? ` Portfolio: ${formatCurrency(balance)}.` : '';
-    events.push({ age, isFI: false, title: 'Today', body: `Age ${formatNumber(age)}.${balNote} Working — ${formatCurrency(income)}/yr income, ${formatCurrency(expenses)}/yr expenses.` });
+    const todayBody = income > 0
+        ? `Age ${formatNumber(age)}.${balNote} Working — ${formatCurrency(income)}/yr income, ${formatCurrency(expenses)}/yr expenses.`
+        : `Age ${formatNumber(age)}.${balNote} No employment income — living on ${formatCurrency(expenses)}/yr in expenses, funded by your portfolio and any pension/CPP/OAS income.`;
+    events.push({ age, isFI: false, title: 'Today', body: todayBody });
 
     if (includeRetAge && Math.abs(plannedRetAge - fiAge) > 0.1) {
         const isAfterFI = plannedRetAge > fiAge;
@@ -1315,27 +1147,8 @@ function rptTimeline(d) {
         events.push({ age: plannedRetAge, isFI: false, title: 'Employment Retirement', body: `${prefix} ${incDesc}` });
     }
 
-    // FI description — same allSourcesActiveAtFI logic as main timeline
-    const netExpAtFI = Math.max(0, expenses - getRetirementIncome(fiAge, benefits));
-    const rptTransAges = [];
-    if (pensionAge < 999) { rptTransAges.push(pensionAge); if (bridgeBenefit > 0 && pensionAge < 65) rptTransAges.push(65); }
-    if (cppAge < 999) rptTransAges.push(cppAge);
-    if (oasAge < 999) rptTransAges.push(oasAge);
-    const rptTerminalAge = rptTransAges.length > 0 ? Math.max(...rptTransAges) : 0;
-    const rptAllActive   = rptTerminalAge === 0 || fiAge >= rptTerminalAge;
-    const rptTerminalGap = Math.max(0, expenses -
-        (pensionAge < 999 ? lifetimePension : 0) - (cppAge < 999 ? cppAmount : 0) -
-        (oasAge < 999 ? oasAmount : 0) - (benefits.rentalIncome || 0));
-    let rptFiBody;
-    if (netExpAtFI === 0) {
-        rptFiBody = `Income sources fully cover all ${formatCurrency(expenses)}/yr at this age — no portfolio drawdown needed.`;
-    } else if (rptAllActive) {
-        rptFiBody = `Portfolio reaches ${formatCurrency(fiPortfolio)}, generating ${formatCurrency(fiPortfolio * swrDecimal)}/yr at ${formatNumber(swr)}% SWR to cover the ${formatCurrency(netExpAtFI)}/yr gap after income sources.`;
-    } else {
-        rptFiBody = rptTerminalGap <= 0
-            ? `Portfolio of ${formatCurrency(fiPortfolio)} bridges all expenses until income sources take over completely.`
-            : `Portfolio of ${formatCurrency(fiPortfolio)} bridges expenses to your income sources, then sustains a ${formatCurrency(rptTerminalGap)}/yr drawdown at ${formatNumber(swr)}% SWR.`;
-    }
+    // FI description — shared single source of truth with the calculator.
+    const rptFiBody = describeFiPortfolio(fiAge, expenses, benefits, fiPortfolio, swr, swrDecimal);
     events.push({ age: fiAge, isFI: true, title: 'Financial Independence', body: rptFiBody });
 
     if (includePension && pensionAge < 999 && pensionAge > age) {
@@ -1371,7 +1184,8 @@ function rptTimeline(d) {
     return `
         <div class="report-section">
             <div class="report-section-label">Section 4</div>
-            <h2>Your Financial Journey</h2>
+            <h2>Your Financial Journey, Step by Step</h2>
+            <p class="report-narrative">Here is the same plan told as a story — the key moments from today onward, and what changes at each one. The highlighted milestone is the day you become financially independent.</p>
             <ul class="report-timeline">${items}</ul>
         </div>`;
 }
@@ -1502,16 +1316,16 @@ function rptAssumptions(d) {
     return `
         <div class="report-section">
             <div class="report-section-label">Section 6</div>
-            <h2>Key Assumptions</h2>
-            <ul style="color:var(--text-muted);line-height:1.75;padding-left:1.25rem;font-size:0.88rem;">
-                <li><strong>Annual Return (${formatNumber(roiAnnual)}%):</strong> Post-tax and inflation-adjusted. All figures are in today's dollars.</li>
-                <li><strong>Safe Withdrawal Rate (${formatNumber(swr)}%):</strong> Determines the portfolio target. Based on Bengen (1994) — a balanced portfolio can sustain this withdrawal rate over 30+ years.</li>
-                <li><strong>Compounding:</strong> Simulated monthly for precision.</li>
-                <li><strong>Terminal age:</strong> 100. FI is the earliest point your portfolio can sustain withdrawals to age 100.</li>
-                ${isGCMode && bridgeBenefit > 0 ? '<li><strong>Bridge Benefit:</strong> Assumed to end at precisely age 65, per standard PSSA structure.</li>' : ''}
-                <li><strong>Primary residence:</strong> Excluded from portfolio calculations.</li>
+            <h2>What We Assumed (and What to Watch)</h2>
+            <p class="report-narrative">Every projection rests on a few assumptions. Here they are in plain language, so you know exactly what this report is — and is not — promising.</p>
+            <ul class="report-source-list">
+                <li><strong>Your investments grow ${formatNumber(roiAnnual)}% a year, after inflation.</strong> Because inflation is already removed, every dollar in this report is in <em>today's</em> money — ${formatCurrency(100000)} here means today's spending power, not a bigger-but-weaker future number. Real markets are bumpy; this is a steady long-run average, not a guarantee.</li>
+                <li><strong>You can safely spend ${formatNumber(swr)}% of your portfolio each year.</strong> This "safe withdrawal rate" comes from research (Bengen, 1994) showing a balanced portfolio has historically lasted 30+ years at this pace. Spend much more and you risk running dry; spend less and you almost certainly leave money behind.</li>
+                <li><strong>Financial independence means lasting to age 100.</strong> We treat you as independent at the earliest age your money can cover expenses all the way to 100 — a deliberately cautious finish line.</li>
+                ${isGCMode && bridgeBenefit > 0 ? '<li><strong>Your pension\'s "bridge" top-up ends exactly at 65.</strong> This follows the standard federal (PSSA) pension structure, where the bridge hands off to CPP and OAS at 65.</li>' : ''}
+                <li><strong>Your home is not counted.</strong> The roof over your head isn't part of the portfolio that pays your bills, so it is left out entirely.</li>
             </ul>
-            <p class="report-narrative" style="margin-top:1rem;font-size:0.82rem;">For personal scenario planning only — not financial advice. See <a href="methodology.html" style="color:var(--accent-color);">the full methodology</a> for complete details and data sources.</p>
+            <p class="report-narrative" style="margin-top:1.1rem;font-size:0.82rem;">This is a personal planning tool, <strong>not financial advice</strong>. Real life brings tax rules, market swings and life changes a simple model can't capture — treat it as a well-informed starting point, not a promise. The <a href="methodology.html" style="color:var(--accent-color);">full methodology</a> has the formulas and data sources.</p>
         </div>`;
 }
 
@@ -1520,6 +1334,9 @@ function rptAssumptions(d) {
     const tabCalc   = document.getElementById('navTabCalculator');
     const tabReport = document.getElementById('navTabReport');
     if (!tabCalc || !tabReport) return;
+
+    // Report tab unpublished — hide it and keep the calculator as the only view.
+    if (!SHOW_REPORT_TAB) { tabReport.style.display = 'none'; return; }
 
     const dashboard   = document.querySelector('.dashboard');
     const compPanel   = document.getElementById('comparisonPanel');

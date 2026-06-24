@@ -1,0 +1,13 @@
+{
+  "name": "db-early-retirement-calculator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static FI / early-retirement calculator for Canadian public servants with a defined-benefit pension.",
+  "scripts": {
+    "test": "node tests/run-scenarios.js",
+    "test:dom": "node tests/smoke-dom.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}
