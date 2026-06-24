@@ -535,6 +535,9 @@ function calculateRetirement() {
         chartStatus.innerText   = `Savings run out at age ${formatNumber(result.depletionAge)}`;
         chartStatus.style.color = "#ef4444";
         chartStatus.className   = "badge badge-danger";
+        // "Time to FI" is meaningless when the current plan runs out — suppress it.
+        // The FI age subtext stays so the user knows when they'd need to work until.
+        results.yearsToFI.innerText = '--';
     } else {
         chartStatus.innerText   = fiBeforeRet ? "FI before retirement" : fiAfterRet ? "FI after retirement" : "FI achieved";
         chartStatus.style.color = "";
