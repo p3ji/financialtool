@@ -1358,7 +1358,9 @@ function rptAssumptions(d) {
     function setView(view) {
         const isReport = view === 'report';
         dashboard.style.display  = isReport ? 'none' : '';
-        compPanel.style.display  = isReport ? 'none' : '';
+        // StatCan comparison is hidden on the calculator — it lives in the
+        // Report tab (§5) in fuller, plain-language detail.
+        if (compPanel) compPanel.style.display = 'none';
         repPanel.style.display   = isReport ? 'block' : 'none';
         if (mainHeader) mainHeader.style.display = isReport ? 'none' : '';
         tabCalc.classList.toggle('active', !isReport);
