@@ -1357,3 +1357,68 @@ function rptAssumptions(d) {
     tabCalc.addEventListener('click',   e => { e.preventDefault(); setView('calculator'); });
     tabReport.addEventListener('click', e => { e.preventDefault(); setView('report'); });
 }());
+
+// Contact form handling
+(function () {
+    const contactBtn = document.getElementById('contactBtn');
+    const contactModal = document.getElementById('contactModal');
+    const contactCloseBtn = document.getElementById('contactCloseBtn');
+    const contactForm = document.getElementById('contactForm');
+    const contactStatus = document.getElementById('contactStatus');
+    const contactSubmitBtn = document.getElementById('contactSubmitBtn');
+
+    if (!contactBtn || !contactModal || !contactForm) return;
+
+    contactBtn.addEventListener('click', e => {
+        e.preventDefault();
+        contactModal.style.display = 'flex';
+    });
+
+    contactCloseBtn.addEventListener('click', () => {
+        contactModal.style.display = 'none';
+        contactForm.reset();
+        contactStatus.textContent = '';
+    });
+
+    contactModal.addEventListener('click', e => {
+        if (e.target === contactModal) {
+            contactModal.style.display = 'none';
+            contactForm.reset();
+            contactStatus.textContent = '';
+        }
+    });
+
+    contactForm.addEventListener('submit', async e => {
+        e.preventDefault();
+        contactSubmitBtn.disabled = true;
+        contactStatus.textContent = 'Sending...';
+
+        const formData = new FormData(contactForm);
+        formData.append('access_key', '0b8deaf8-6363-488d-8040-ac50d8053b5f');
+
+        try {
+            const response = await fetch('https://api.web3forms.com/submit', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                contactStatus.textContent = 'Thanks! Your message has been sent.';
+                contactStatus.style.color = 'var(--success-color, #10b981)';
+                contactForm.reset();
+                setTimeout(() => {
+                    contactModal.style.display = 'none';
+                    contactStatus.textContent = '';
+                    contactStatus.style.color = '#666';
+                }, 2000);
+            } else {
+                throw new Error('Form submission failed');
+            }
+        } catch (error) {
+            contactStatus.textContent = 'Error sending message. Please try again.';
+            contactStatus.style.color = '#ef4444';
+        } finally {
+            contactSubmitBtn.disabled = false;
+        }
+    });
+}());
