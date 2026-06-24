@@ -378,11 +378,16 @@
                                (oasAge    < 999 ? oasAmount        : 0) + rentalIncome;
         const terminalGap = Math.max(0, expenses - terminalIncome);
 
+        // Are there any guaranteed (non-portfolio) income sources at all?
+        const hasAnySource = pensionAge < 999 || cppAge < 999 || oasAge < 999 || rentalIncome > 0;
+
         if (netExpAtFI === 0 && allSourcesActiveAtFI) {
             return `Income sources fully cover all expenses at this age — no portfolio drawdown needed.`;
         }
         if (allSourcesActiveAtFI) {
-            return `Portfolio generates ${formatCurrency(fiPortfolio * swrDecimal)}/yr at a ${formatNumber(swr)}% safe withdrawal rate — covering the ${formatCurrency(netExpAtFI)}/yr gap left after your income sources.`;
+            return hasAnySource
+                ? `Portfolio generates ${formatCurrency(fiPortfolio * swrDecimal)}/yr at a ${formatNumber(swr)}% safe withdrawal rate — covering the ${formatCurrency(netExpAtFI)}/yr gap left after your income sources.`
+                : `Portfolio generates ${formatCurrency(fiPortfolio * swrDecimal)}/yr at a ${formatNumber(swr)}% safe withdrawal rate — enough to cover your ${formatCurrency(netExpAtFI)}/yr of expenses on its own.`;
         }
         // Bridge case: FI reached before all income sources are active.
         return terminalGap <= 0

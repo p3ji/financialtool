@@ -1029,7 +1029,7 @@ function rptAnswer(d) {
     // The report is written for readers with little financial background, so
     // explain the safe-withdrawal-rate concept rather than assume it.
     const swrExplainer = netExp > 0
-        ? `<p class="report-narrative" style="font-size:0.85rem;color:var(--text-muted);"><strong>What is a "safe withdrawal rate"?</strong> It is the share of your portfolio you can spend each year — historically around ${formatNumber(swr)}% — that has let portfolios last 30+ years without running dry. At ${formatNumber(swr)}%, every ${formatCurrency(100 / swr)} of portfolio supports about ${formatCurrency(1)} of annual spending, so covering ${formatCurrency(netExp)}/yr needs roughly ${formatCurrency(netExp / swrDecimal)} set aside for that gap.</p>`
+        ? `<p class="report-narrative" style="font-size:0.85rem;color:var(--text-muted);"><strong>What is a "safe withdrawal rate"?</strong> It is the share of your portfolio you can spend each year — historically around ${formatNumber(swr)}% — that has let portfolios last 30+ years without running dry. At ${formatNumber(swr)}%, every ${formatCurrency(100 / swr)} of portfolio supports about ${formatCurrency(1)} of annual spending, so covering ${formatCurrency(netExp)}/yr needs roughly ${formatCurrency(netExp / swrDecimal)} set aside to cover it.</p>`
         : '';
 
     const pensionBlock = includePension && fiPortfolioNoPension !== null && fiPortfolioNoPension > fiPortfolio
@@ -1082,6 +1082,8 @@ function rptIncome(d) {
     const totalPassive = rows.filter(r => !r.pending).reduce((s, r) => s + r.amount, 0);
     const draw = Math.max(0, expenses - totalPassive);
     const anyPending = rows.some(r => r.pending);
+    // No pension / CPP / OAS / rental at all — the portfolio is the whole story.
+    const portfolioOnly = rows.length === 0;
 
     // Bridge vs. steady state: if the withdrawal needed at FI is far more than a
     // steady SWR on the FI portfolio could sustain, the portfolio is BRIDGING
@@ -1108,9 +1110,11 @@ function rptIncome(d) {
             ? `Notice that at age ${formatNumber(fiAge)} <strong>none of your guaranteed income has started yet</strong> — so for now your portfolio covers the full ${formatCurrency(expenses)}/yr. This is a short <strong>bridge</strong>, not a forever withdrawal: your ${formatCurrency(fiPortfolio)} is meant to be spent down over these few years until your pension/CPP/OAS switch on and take over. That is exactly why this FI portfolio can look small — it only has to last until your income arrives.`
             : `At age ${formatNumber(fiAge)} your guaranteed income has only partly started, so your portfolio <strong>bridges</strong> the remaining ${formatCurrency(draw)}/yr by spending down principal until your other income sources begin — after which your own withdrawals drop sharply.`;
     } else {
-        // Steady state: all income active, portfolio sustainably covers the gap at SWR.
+        // Steady state: portfolio sustainably covers the draw at SWR.
         portRow = `<tr class="portfolio-row"><td>Portfolio withdrawal (${formatNumber(swr)}% a year)</td><td style="color:var(--text-muted);font-size:0.83rem;">From your ${formatCurrency(fiPortfolio)} portfolio</td><td>${formatCurrency(draw)}/yr</td></tr>`;
-        coverNote = `At age ${formatNumber(fiAge)}, your guaranteed income covers most of the bill and your portfolio quietly tops up the remaining <strong>${formatCurrency(draw)}/yr</strong>. You never sell everything at once — you withdraw only that gap each year (about ${formatNumber(swr)}% of the portfolio) while the rest stays invested and keeps growing.`;
+        coverNote = portfolioOnly
+            ? `At age ${formatNumber(fiAge)}, your portfolio covers your full ${formatCurrency(expenses)}/yr of expenses on its own — you have no pension, CPP or OAS in the plan, so the portfolio does all the work. You never sell everything at once: you withdraw only about ${formatNumber(swr)}% each year while the rest stays invested and keeps growing.`
+            : `At age ${formatNumber(fiAge)}, your guaranteed income covers most of the bill and your portfolio quietly tops up the remaining <strong>${formatCurrency(draw)}/yr</strong>. You never sell everything at once — you withdraw only that gap each year (about ${formatNumber(swr)}% of the portfolio) while the rest stays invested and keeps growing.`;
     }
 
     const pendingNote = anyPending && !isBridge
@@ -1121,7 +1125,9 @@ function rptIncome(d) {
         <div class="report-section">
             <div class="report-section-label">Section 3</div>
             <h2>Where Your Money Will Come From</h2>
-            <p class="report-narrative">Once you stop working, your income arrives in <strong>layers</strong>. Guaranteed cheques — a pension, CPP, OAS — come in first. Whatever they don't cover, your portfolio fills by selling a small slice each year. Here is how those layers stack up at the age you reach financial independence:</p>
+            <p class="report-narrative">${portfolioOnly
+                ? `Once you stop working, your <strong>portfolio becomes your paycheque</strong>. Each year you sell a small slice — about ${formatNumber(swr)}% — and that covers your expenses, while the rest stays invested and keeps growing. Here is how that looks at the age you reach financial independence:`
+                : `Once you stop working, your income arrives in <strong>layers</strong>. Guaranteed cheques — a pension, CPP, OAS — come in first. Whatever they don't cover, your portfolio fills by selling a small slice each year. Here is how those layers stack up at the age you reach financial independence:`}</p>
             <table class="report-income-table">
                 <thead><tr><th>Income Source</th><th>Timing</th><th style="text-align:right;">Annual Amount</th></tr></thead>
                 <tbody>
@@ -1203,7 +1209,7 @@ function rptTimeline(d) {
 }
 
 function rptBenchmarks(d, province, household) {
-    const { age, income, expenses } = d;
+    const { age, income, expenses, includePension } = d;
 
     const hhLabels = { "Single": "Single / Unattached", "CoupleNoChildren": "Couple without children", "CoupleChildren": "Couple with children", "LoneParent": "Lone-parent family" };
     const ageLabels = { "Under30": "Under 30", "30to39": "30–39", "40to54": "40–54", "55to64": "55–64", "Over65": "65 and over" };
@@ -1242,7 +1248,9 @@ function rptBenchmarks(d, province, household) {
 
     const incInterpret = income === 0 ? 'Enter your income on the Calculator tab to see this comparison.'
         : incDiff >= 0 ? 'Above the median — generally greater capacity to save toward FI.'
-                       : 'Below the median for this group. Your DB pension or other income sources may compensate.';
+                       : (includePension
+                            ? 'Below the median for this group. Your DB pension or other income sources may compensate.'
+                            : 'Below the median for this group. A lower cost of living or other income sources can still keep you on track.');
 
     const expInterpret = expenses === 0 ? 'Enter your expenses on the Calculator tab to see this comparison.'
         : exDiffHH <= 0 ? `Below the average for a ${hhLabel} household — lower spending accelerates your path to FI.`

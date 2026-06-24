@@ -411,6 +411,25 @@ for (const roi of [0, 2, 8]) {
 })();
 
 // ------------------------------------------------------------
+// 14. Portfolio-only user (no pension, CPP, OAS or rental): wording must
+//     not invent "income sources" or claim guaranteed income covers the bill.
+// ------------------------------------------------------------
+(function portfolioOnly() {
+    const p = buildParams({ age: 35, income: 120000, expenses: 60000, balance: 200000 });
+    const r = C.analyze(p);
+    check('[portfolioOnly] FI achievable', r.fiAge !== null, `fiAge=${r.fiAge}`);
+    const desc = C.describeFiPortfolio(r.fiAge, 60000, p.benefits, r.fiPortfolio, p.swr, p.swrDecimal);
+    check('[portfolioOnly] FI desc does not reference non-existent income sources',
+        !/gap left after your income sources/i.test(desc), desc);
+    check('[portfolioOnly] FI desc says the portfolio covers expenses on its own',
+        /on its own/i.test(desc) && /expenses/i.test(desc), desc);
+    // describeIncomeAt with no sources must talk about the portfolio funding expenses.
+    const inc = C.describeIncomeAt(r.fiAge, 60000, p.benefits, false);
+    check('[portfolioOnly] income desc names portfolio funding the full expenses',
+        /portfolio funds the full/i.test(inc), inc);
+})();
+
+// ------------------------------------------------------------
 console.log(`\n${'='.repeat(60)}`);
 console.log(`Scenario tests: ${pass} passed, ${fail} failed`);
 if (failures.length) {
