@@ -68,6 +68,16 @@ concepts (FI, safe withdrawal rate, bridging), explain what the numbers mean
 for *them*, and tell the story age-by-age. Technical depth and data sources
 belong in `methodology.html`, not here.
 
+### Report publication gate
+
+The Report tab is gated behind `SHOW_REPORT_TAB` near the top of `app.js`
+(default **off** — unpublished, pending review). While off, the nav tab is
+hidden and `renderReport` produces nothing (so it can't leak via the print
+stylesheet either). To **publish**, flip the default to `true`. To **preview
+without publishing**, set `window.__PUBLISH_REPORT_TAB__ = true` before
+`app.js` loads — this is exactly what `tests/smoke-dom.js` does so the report
+stays testable while hidden in production.
+
 ## Running the tests
 
 ```bash

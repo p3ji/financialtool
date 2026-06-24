@@ -8,6 +8,19 @@ const {
     describeIncomeAt, describeFiPortfolio
 } = FinCalc;
 
+// ---------------------------------------------------------------
+// Report tab gate.
+// The narrative Report tab stays UNPUBLISHED until it has been reviewed
+// and approved. While off: the nav tab is hidden and the report is not
+// rendered (so it can't leak via print either).
+//
+// To PUBLISH: change the default below to `true` (or, to preview without
+// publishing, set `window.__PUBLISH_REPORT_TAB__ = true` before app.js
+// loads — this is what the test harness and a local preview use).
+// ---------------------------------------------------------------
+const SHOW_REPORT_TAB =
+    (typeof window !== 'undefined' && window.__PUBLISH_REPORT_TAB__ === true) || false;
+
 const STATCAN_DATA = {
     spendingByProvince: {
         "Canada": 76750,
@@ -876,9 +889,10 @@ function updateDemographicBenchmarks() {
 // ============================================================
 
 function renderReport(data) {
-    lastReportData = data;
     const panel = document.getElementById('reportPanel');
     if (!panel) return;
+    if (!SHOW_REPORT_TAB) { panel.innerHTML = ''; lastReportData = null; return; }
+    lastReportData = data;
     const province  = document.getElementById('demoProvince')?.value  || 'Canada';
     const household = document.getElementById('demoHousehold')?.value || 'CoupleNoChildren';
     panel.innerHTML = buildReportHTML(data, province, household);
@@ -897,6 +911,7 @@ function buildReportHTML(data, province, household) {
                 </div>
                 <button class="report-print-btn" onclick="window.print()">Print / Save PDF</button>
             </div>
+            <p class="report-intro">This report turns the numbers from the calculator into plain English. It walks through <strong>where you stand today</strong>, <strong>when you could stop needing a paycheque</strong>, <strong>where your money will come from</strong> in retirement, and <strong>how you compare</strong> to other Canadians. No financial background needed — every term is explained as it comes up. For the formulas and data sources behind it, see the <a href="methodology.html" style="color:var(--accent-color);">methodology</a>.</p>
             ${rptSnapshot(data)}
             ${rptAnswer(data)}
             ${fiAge ? rptIncome(data) : ''}
@@ -932,34 +947,50 @@ function rptSnapshot(d) {
             includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
             includeCppOas, cppAmount, cppAge, oasAmount, oasAge, rentalIncome } = d;
 
-    const incText = income > 0
-        ? `earning <strong>${formatCurrency(income)}/yr</strong> after tax`
-        : 'no employment income entered';
-    const savText = income > 0 && expenses > 0
-        ? ` Savings rate: <strong>${formatNumber(savingsRate)}%</strong> (${formatCurrency(savings)}/yr).`
-        : '';
-    const balText = balance > 0
-        ? `Current portfolio: <strong>${formatCurrency(balance)}</strong>.`
-        : 'No current portfolio balance entered.';
+    // A plain-language story of the numbers rather than a label/value dump.
+    const earnSpend = income > 0
+        ? `You earn <strong>${formatCurrency(income)} a year</strong> after tax and spend about <strong>${formatCurrency(expenses)}</strong>, `
+        : `You have not entered any employment income, and you spend about <strong>${formatCurrency(expenses)} a year</strong>. `;
 
-    const sources = [];
+    let saveStory = '';
+    if (income > 0) {
+        if (savings > 0) {
+            saveStory = `which means you put away <strong>${formatCurrency(savings)} a year</strong> — roughly <strong>${formatNumber(savingsRate)} cents of every dollar</strong> you take home. That savings rate is the single biggest lever on when you become financially independent: the more of each paycheque you keep and invest, the sooner those investments can support you instead of your job.`;
+        } else if (savings === 0) {
+            saveStory = `which means that right now you spend everything you earn. Financial independence really gets going once you find even a small, regular surplus to invest.`;
+        } else {
+            saveStory = `which means you currently spend <strong>${formatCurrency(-savings)} more than you earn</strong> each year. Closing that gap — or leaning on guaranteed income such as a pension — is what makes early independence possible.`;
+        }
+    }
+
+    const balStory = balance > 0
+        ? `You have already built an investment portfolio worth <strong>${formatCurrency(balance)}</strong>. Think of a portfolio as a money-making machine: invested sensibly, it grows on its own and will eventually pay you an income without you lifting a finger.`
+        : `You have not entered an investment portfolio yet. A "portfolio" is simply the pool of invested savings that one day pays you an income in place of a job — it is the engine this whole plan is built around.`;
+
+    // Future income sources, each with a one-line plain explanation, because a
+    // reader new to this may not know what a DB pension, CPP or OAS actually is.
+    const sourceLines = [];
     if (includePension) {
         const total = lifetimePension + bridgeBenefit;
-        const label = isGCMode ? 'MyGCPension' : 'DB Pension';
-        sources.push(`${label}: <strong>${formatCurrency(total)}/yr</strong> at age ${formatNumber(pensionAge)}`
-            + (isGCMode && bridgeBenefit > 0 ? ` (${formatCurrency(bridgeBenefit)} bridge ends at 65)` : ''));
+        const label = isGCMode ? 'your government (MyGCPension) defined-benefit pension' : 'your defined-benefit (DB) pension';
+        sourceLines.push(`<li><strong>${formatCurrency(total)}/yr from ${label}</strong>, beginning at age ${formatNumber(pensionAge)}. A defined-benefit pension is a guaranteed paycheque for life that your employer funds — income you never had to save for yourself${isGCMode && bridgeBenefit > 0 ? `. Part of it (a ${formatCurrency(bridgeBenefit)}/yr "bridge") tops you up until 65, then stops once CPP and OAS take over` : ''}.</li>`);
     }
-    if (includeCppOas && cppAmount > 0) sources.push(`CPP: <strong>${formatCurrency(cppAmount)}/yr</strong> at age ${cppAge}`);
-    if (includeCppOas && oasAmount > 0) sources.push(`OAS: <strong>${formatCurrency(oasAmount)}/yr</strong> at age ${oasAge}`);
-    if (rentalIncome > 0) sources.push(`Rental income: <strong>${formatCurrency(rentalIncome)}/yr</strong>`);
+    if (includeCppOas && cppAmount > 0) sourceLines.push(`<li><strong>${formatCurrency(cppAmount)}/yr from CPP</strong>, starting at age ${cppAge}. The Canada Pension Plan pays you back, as a monthly cheque for life, for the contributions taken off your paycheques during your working years.</li>`);
+    if (includeCppOas && oasAmount > 0) sourceLines.push(`<li><strong>${formatCurrency(oasAmount)}/yr from OAS</strong>, starting at age ${oasAge}. Old Age Security is a pension most Canadians receive from the government starting around 65, paid out of general taxes rather than your own contributions.</li>`);
+    if (rentalIncome > 0) sourceLines.push(`<li><strong>${formatCurrency(rentalIncome)}/yr in rental income</strong> from property you own — income that arrives whether or not you are working.</li>`);
+
+    const sourcesBlock = sourceLines.length
+        ? `<p class="report-narrative">On top of your own savings, you can count on these guaranteed income streams later in life:</p>
+           <ul class="report-source-list">${sourceLines.join('')}</ul>`
+        : `<p class="report-narrative">You have not added a pension, CPP or OAS. That is fine — this report will show what your portfolio needs to do on its own. Adding those sources on the Calculator tab will show how much they shorten the journey.</p>`;
 
     return `
         <div class="report-section">
             <div class="report-section-label">Section 1</div>
-            <h2>Your Financial Snapshot</h2>
-            <p class="report-narrative">Age <strong>${formatNumber(age)}</strong> — ${incText}, with <strong>${formatCurrency(expenses)}/yr</strong> in annual expenses.${savText}</p>
-            <p class="report-narrative">${balText}</p>
-            ${sources.length ? `<p class="report-narrative">Retirement income sources: ${sources.join(' &nbsp;·&nbsp; ')}.</p>` : ''}
+            <h2>Where You Stand Today</h2>
+            <p class="report-narrative">You are <strong>${formatNumber(age)} years old</strong>. ${earnSpend}${saveStory}</p>
+            <p class="report-narrative">${balStory}</p>
+            ${sourcesBlock}
         </div>`;
 }
 
@@ -1014,7 +1045,7 @@ function rptAnswer(d) {
 function rptIncome(d) {
     const { fiAge, expenses, includePension, isGCMode, pensionAge, lifetimePension,
             bridgeBenefit, includeCppOas, cppAmount, cppAge, oasAmount, oasAge,
-            rentalIncome, swr, fiPortfolio } = d;
+            rentalIncome, swr, swrDecimal, fiPortfolio } = d;
 
     const rows = [];
     if (includePension && pensionAge < 999) {
@@ -1038,6 +1069,14 @@ function rptIncome(d) {
 
     const totalPassive = rows.filter(r => !r.pending).reduce((s, r) => s + r.amount, 0);
     const draw = Math.max(0, expenses - totalPassive);
+    const anyPending = rows.some(r => r.pending);
+
+    // Bridge vs. steady state: if the withdrawal needed at FI is far more than a
+    // steady SWR on the FI portfolio could sustain, the portfolio is BRIDGING
+    // (temporarily spending principal until your income sources switch on) — it
+    // is NOT a permanent SWR draw. Detect numerically so the wording is honest.
+    const steadyDraw = fiPortfolio * swrDecimal;
+    const isBridge   = draw > steadyDraw + 1;
 
     const rowsHTML = rows.map(r => `
         <tr${r.pending ? ' class="pending-row"' : ''}>
@@ -1046,18 +1085,31 @@ function rptIncome(d) {
             <td>${r.pending ? '<em style="font-size:0.8rem;color:var(--text-muted);">not yet active</em>' : formatCurrency(r.amount) + '/yr'}</td>
         </tr>`).join('');
 
-    const portRow = draw > 0
-        ? `<tr class="portfolio-row"><td>Portfolio withdrawal (${formatNumber(swr)}% SWR)</td><td style="color:var(--text-muted);font-size:0.83rem;">From ${formatCurrency(fiPortfolio)} portfolio at FI</td><td>${formatCurrency(draw)}/yr</td></tr>`
-        : `<tr class="portfolio-row"><td colspan="2" style="color:var(--text-muted);">Portfolio — no drawdown needed</td><td>$0/yr</td></tr>`;
+    let portRow, coverNote;
+    if (draw === 0) {
+        portRow = `<tr class="portfolio-row"><td colspan="2" style="color:var(--text-muted);">Portfolio — no withdrawal needed</td><td>$0/yr</td></tr>`;
+        coverNote = `At age ${formatNumber(fiAge)}, your guaranteed income alone fully covers your ${formatCurrency(expenses)}/yr of expenses — your portfolio can keep growing untouched, a comfortable cushion against surprises.`;
+    } else if (isBridge) {
+        // FI reached before income sources begin — portfolio temporarily funds (most of) the bill.
+        portRow = `<tr class="portfolio-row"><td>Portfolio (bridge)</td><td style="color:var(--text-muted);font-size:0.83rem;">Spends down ${formatCurrency(fiPortfolio)} until your income starts</td><td>${formatCurrency(draw)}/yr</td></tr>`;
+        coverNote = totalPassive === 0
+            ? `Notice that at age ${formatNumber(fiAge)} <strong>none of your guaranteed income has started yet</strong> — so for now your portfolio covers the full ${formatCurrency(expenses)}/yr. This is a short <strong>bridge</strong>, not a forever withdrawal: your ${formatCurrency(fiPortfolio)} is meant to be spent down over these few years until your pension/CPP/OAS switch on and take over. That is exactly why this FI portfolio can look small — it only has to last until your income arrives.`
+            : `At age ${formatNumber(fiAge)} your guaranteed income has only partly started, so your portfolio <strong>bridges</strong> the remaining ${formatCurrency(draw)}/yr by spending down principal until your other income sources begin — after which your own withdrawals drop sharply.`;
+    } else {
+        // Steady state: all income active, portfolio sustainably covers the gap at SWR.
+        portRow = `<tr class="portfolio-row"><td>Portfolio withdrawal (${formatNumber(swr)}% a year)</td><td style="color:var(--text-muted);font-size:0.83rem;">From your ${formatCurrency(fiPortfolio)} portfolio</td><td>${formatCurrency(draw)}/yr</td></tr>`;
+        coverNote = `At age ${formatNumber(fiAge)}, your guaranteed income covers most of the bill and your portfolio quietly tops up the remaining <strong>${formatCurrency(draw)}/yr</strong>. You never sell everything at once — you withdraw only that gap each year (about ${formatNumber(swr)}% of the portfolio) while the rest stays invested and keeps growing.`;
+    }
 
-    const coverNote = draw === 0
-        ? `At age ${formatNumber(fiAge)}, your passive income fully covers your ${formatCurrency(expenses)}/yr in expenses — no portfolio withdrawals required.`
-        : `At age ${formatNumber(fiAge)}, the portfolio covers the ${formatCurrency(draw)}/yr gap between your expenses and your active income sources.`;
+    const pendingNote = anyPending && !isBridge
+        ? `<p class="report-narrative">Some of your income (marked <em>not yet active</em>) does not start until later. In the early years your portfolio shoulders more of the load, and as each pension or benefit switches on, the amount you withdraw drops. The plan already accounts for this.</p>`
+        : '';
 
     return `
         <div class="report-section">
             <div class="report-section-label">Section 3</div>
-            <h2>Retirement Income at FI (Age ${formatNumber(fiAge)})</h2>
+            <h2>Where Your Money Will Come From</h2>
+            <p class="report-narrative">Once you stop working, your income arrives in <strong>layers</strong>. Guaranteed cheques — a pension, CPP, OAS — come in first. Whatever they don't cover, your portfolio fills by selling a small slice each year. Here is how those layers stack up at the age you reach financial independence:</p>
             <table class="report-income-table">
                 <thead><tr><th>Income Source</th><th>Timing</th><th style="text-align:right;">Annual Amount</th></tr></thead>
                 <tbody>
@@ -1067,6 +1119,7 @@ function rptIncome(d) {
                 </tbody>
             </table>
             <p class="report-narrative">${coverNote}</p>
+            ${pendingNote}
         </div>`;
 }
 
@@ -1131,7 +1184,8 @@ function rptTimeline(d) {
     return `
         <div class="report-section">
             <div class="report-section-label">Section 4</div>
-            <h2>Your Financial Journey</h2>
+            <h2>Your Financial Journey, Step by Step</h2>
+            <p class="report-narrative">Here is the same plan told as a story — the key moments from today onward, and what changes at each one. The highlighted milestone is the day you become financially independent.</p>
             <ul class="report-timeline">${items}</ul>
         </div>`;
 }
@@ -1262,16 +1316,16 @@ function rptAssumptions(d) {
     return `
         <div class="report-section">
             <div class="report-section-label">Section 6</div>
-            <h2>Key Assumptions</h2>
-            <ul style="color:var(--text-muted);line-height:1.75;padding-left:1.25rem;font-size:0.88rem;">
-                <li><strong>Annual Return (${formatNumber(roiAnnual)}%):</strong> Post-tax and inflation-adjusted. All figures are in today's dollars.</li>
-                <li><strong>Safe Withdrawal Rate (${formatNumber(swr)}%):</strong> Determines the portfolio target. Based on Bengen (1994) — a balanced portfolio can sustain this withdrawal rate over 30+ years.</li>
-                <li><strong>Compounding:</strong> Simulated monthly for precision.</li>
-                <li><strong>Terminal age:</strong> 100. FI is the earliest point your portfolio can sustain withdrawals to age 100.</li>
-                ${isGCMode && bridgeBenefit > 0 ? '<li><strong>Bridge Benefit:</strong> Assumed to end at precisely age 65, per standard PSSA structure.</li>' : ''}
-                <li><strong>Primary residence:</strong> Excluded from portfolio calculations.</li>
+            <h2>What We Assumed (and What to Watch)</h2>
+            <p class="report-narrative">Every projection rests on a few assumptions. Here they are in plain language, so you know exactly what this report is — and is not — promising.</p>
+            <ul class="report-source-list">
+                <li><strong>Your investments grow ${formatNumber(roiAnnual)}% a year, after inflation.</strong> Because inflation is already removed, every dollar in this report is in <em>today's</em> money — ${formatCurrency(100000)} here means today's spending power, not a bigger-but-weaker future number. Real markets are bumpy; this is a steady long-run average, not a guarantee.</li>
+                <li><strong>You can safely spend ${formatNumber(swr)}% of your portfolio each year.</strong> This "safe withdrawal rate" comes from research (Bengen, 1994) showing a balanced portfolio has historically lasted 30+ years at this pace. Spend much more and you risk running dry; spend less and you almost certainly leave money behind.</li>
+                <li><strong>Financial independence means lasting to age 100.</strong> We treat you as independent at the earliest age your money can cover expenses all the way to 100 — a deliberately cautious finish line.</li>
+                ${isGCMode && bridgeBenefit > 0 ? '<li><strong>Your pension\'s "bridge" top-up ends exactly at 65.</strong> This follows the standard federal (PSSA) pension structure, where the bridge hands off to CPP and OAS at 65.</li>' : ''}
+                <li><strong>Your home is not counted.</strong> The roof over your head isn't part of the portfolio that pays your bills, so it is left out entirely.</li>
             </ul>
-            <p class="report-narrative" style="margin-top:1rem;font-size:0.82rem;">For personal scenario planning only — not financial advice. See <a href="methodology.html" style="color:var(--accent-color);">the full methodology</a> for complete details and data sources.</p>
+            <p class="report-narrative" style="margin-top:1.1rem;font-size:0.82rem;">This is a personal planning tool, <strong>not financial advice</strong>. Real life brings tax rules, market swings and life changes a simple model can't capture — treat it as a well-informed starting point, not a promise. The <a href="methodology.html" style="color:var(--accent-color);">full methodology</a> has the formulas and data sources.</p>
         </div>`;
 }
 
@@ -1280,6 +1334,9 @@ function rptAssumptions(d) {
     const tabCalc   = document.getElementById('navTabCalculator');
     const tabReport = document.getElementById('navTabReport');
     if (!tabCalc || !tabReport) return;
+
+    // Report tab unpublished — hide it and keep the calculator as the only view.
+    if (!SHOW_REPORT_TAB) { tabReport.style.display = 'none'; return; }
 
     const dashboard   = document.querySelector('.dashboard');
     const compPanel   = document.getElementById('comparisonPanel');
