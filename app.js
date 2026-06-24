@@ -404,9 +404,18 @@ function calculateRetirement() {
         results.fiPortfolio.innerText = formatCurrency(fiTargetAtRet);
         // Age the planned projection runs the portfolio dry (if it does).
         const depletionAge = result.depletionAge;
-        chartStatus.innerText    = includeRetAge ? "FI not achievable before retirement" : "FI not achievable";
-        chartStatus.style.color  = "#ef4444";
-        chartStatus.className    = "badge badge-danger";
+        // If FI is not perpetually achievable, check if the plan still survives to 100.
+        // If it does (depletionAge === null), user is on a sustainable path even without
+        // meeting the 4% SWR perpetual FI target. If it depletes, flag it loudly.
+        if (depletionAge !== null) {
+            chartStatus.innerText    = `Savings run out at age ${formatNumber(depletionAge)}`;
+            chartStatus.style.color  = "#ef4444";
+            chartStatus.className    = "badge badge-danger";
+        } else {
+            chartStatus.innerText    = "On track (plan survives to 100)";
+            chartStatus.style.color  = "";
+            chartStatus.className    = "badge badge-info";
+        }
         // Even when FI isn't achievable, keep the detailed table available — it
         // shows the year-by-year drawdown (including where the balance goes
         // negative), which is useful for understanding and debugging the plan.
