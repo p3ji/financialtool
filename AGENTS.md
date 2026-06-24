@@ -38,11 +38,20 @@ Key exports:
   credited every month it is active**; surplus reinvests into the portfolio,
   deficits draw it down. Employment income is added only while working.
 - `analyze(params)` — orchestration. Runs **two passes**:
-  1. an **accumulation pass** (employment continues to 100) used purely to find
-     the FI month → makes the **FI age independent of the chosen retirement
-     date**;
+  1. an **accumulation pass** (employment continues to `MAX_WORK_AGE`, **not**
+     forever) used purely to find the FI month → makes the **FI age independent
+     of the chosen retirement date**. Stopping at a realistic maximum working
+     age means someone whose income never covers expenses can't be reported as
+     "reaching FI" in their 80s/90s (an artifact of modelling work-to-100) —
+     they correctly come back **not achievable** (`fiMonth === null`);
   2. a **projection pass** using the actual planned retirement date for the
-     chart/table.
+     chart/table. It also reports `depletionAge` — the age the *planned*
+     portfolio hits $0 — so the "not achievable" UI can say "savings exhausted
+     around age X" instead of implying a phantom FI milestone.
+
+  `MAX_WORK_AGE` (currently **75**) is the single knob for "nobody works
+  forever." Anyone who reaches FI *before* it is completely unaffected (their
+  crossover month is identical); only the income-≤-expenses grinders change.
 - `describeIncomeAt(...)` / `describeFiPortfolio(...)` — shared narrative
   strings so the calculator timeline and the Report tab never contradict.
 
@@ -59,6 +68,13 @@ Key exports:
 5. **Wording is coherent.** In the steady-SWR regime the generated income must
    equal the stated gap. When FI is reached *before* an income source starts,
    use **bridge** wording — never claim an SWR draw "covers" the full expenses.
+6. **No phantom FI for grinders.** If income never covers expenses (and no
+   income source closes the gap), FI must be **not achievable**, never a
+   late-life "FI at 92/97" produced by pretending the user works to 100. The
+   accumulation pass stops employment at `MAX_WORK_AGE` to enforce this, and
+   the classification stays retirement-date independent (see #1). The headline
+   and the detailed table must never contradict (no "FI at 92" sitting on a
+   table that shows the portfolio millions in the red).
 
 ## Report tab philosophy
 

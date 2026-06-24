@@ -358,6 +358,59 @@ for (const roi of [0, 2, 8]) {
 })();
 
 // ------------------------------------------------------------
+// 13. "Not achievable" when income never covers expenses.
+//     A grinder whose income < expenses must NOT be reported as reaching
+//     FI in their 80s/90s (an artifact of modelling work-to-100). They
+//     come back as not achievable, and the classification stays
+//     retirement-date independent (INV1).
+// ------------------------------------------------------------
+(function notAchievable() {
+    // User-reported case: income 50k << expenses 95k, big-but-insufficient
+    // 1M portfolio, retire at 45. Previously reported a bogus "FI at ~97".
+    const retEarly = C.analyze(buildParams({
+        age: 38, income: 50000, expenses: 95000, balance: 1000000,
+        includeRetAge: true, plannedRetAge: 45 }));
+    check('[notAchiev] grinder retiring early is NOT achievable',
+        retEarly.fiAge === null, `fiAge=${retEarly.fiAge}`);
+    check('[notAchiev] exposes a finite depletion age past current age',
+        finite(retEarly.depletionAge) && retEarly.depletionAge > 38,
+        `depletionAge=${retEarly.depletionAge}`);
+
+    // Same inputs, NO retirement date → must classify identically (INV1):
+    // not achievable regardless of when (or whether) they plan to retire.
+    const noRet = C.analyze(buildParams({
+        age: 38, income: 50000, expenses: 95000, balance: 1000000 }));
+    check('[notAchiev] same case with no retirement date is also not achievable',
+        noRet.fiAge === null, `fiAge=${noRet.fiAge}`);
+
+    // Breakeven earner, no savings, with CPP/OAS — previously "FI at ~98.8".
+    const breakeven = C.analyze(buildParams({
+        age: 35, income: 90000, expenses: 90000, balance: 0,
+        cppAge: 65, cppAmount: 12000, oasAge: 65, oasAmount: 8000 }));
+    check('[notAchiev] breakeven earner with no savings is not achievable',
+        breakeven.fiAge === null, `fiAge=${breakeven.fiAge}`);
+
+    // Guard against over-reach: a genuine saver still reaches FI, and an
+    // achievable plan never reports a (spurious) depletion age.
+    const saver = C.analyze(buildParams({
+        age: 38, income: 150000, expenses: 95000, balance: 1000000,
+        pensionAge: 60, lifetimePension: 100000,
+        includeRetAge: true, plannedRetAge: 45 }));
+    check('[notAchiev] genuine saver stays achievable (cap did not over-reach)',
+        saver.fiAge !== null && saver.fiAge < 45, `fiAge=${saver.fiAge}`);
+    check('[notAchiev] achievable plan reports no depletion',
+        saver.depletionAge === null, `depletionAge=${saver.depletionAge}`);
+
+    // Anyone who reaches FI before the max working age is unaffected by the
+    // cap — Case 1 (pension at 60) still lands at ~58.9, not "not achievable".
+    const case1 = C.analyze(buildParams({
+        age: 35, income: 90000, expenses: 95000, balance: 100000,
+        pensionAge: 60, lifetimePension: 100000 }));
+    check('[notAchiev] sub-cap FI (Case 1) preserved at ~58.9',
+        case1.fiAge !== null && Math.abs(case1.fiAge - 58.9) < 0.3, `fiAge=${case1.fiAge}`);
+})();
+
+// ------------------------------------------------------------
 console.log(`\n${'='.repeat(60)}`);
 console.log(`Scenario tests: ${pass} passed, ${fail} failed`);
 if (failures.length) {

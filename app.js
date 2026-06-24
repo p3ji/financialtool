@@ -402,6 +402,8 @@ function calculateRetirement() {
         const fiTargetRefAge = (includeRetAge && plannedRetAge > age) ? plannedRetAge : age;
         const fiTargetAtRet  = getRequiredBalanceAtAge(fiTargetRefAge, expenses, swrDecimal, rMonthly, benefits);
         results.fiPortfolio.innerText = formatCurrency(fiTargetAtRet);
+        // Age the planned projection runs the portfolio dry (if it does).
+        const depletionAge = result.depletionAge;
         chartStatus.innerText    = includeRetAge ? "FI not achievable before retirement" : "FI not achievable";
         chartStatus.style.color  = "#ef4444";
         chartStatus.className    = "badge badge-danger";
@@ -418,7 +420,7 @@ function calculateRetirement() {
             <div class="timeline-marker"></div>
             <div class="timeline-content">
                 <h4>Today (Age ${formatNumber(age)})</h4>
-                <p>Starting with ${formatCurrency(balance)} in investment portfolio. At current savings rate, the FI target of ${formatCurrency(fiTargetAtRet)} is not reachable${includeRetAge ? ` before retirement at age ${formatNumber(plannedRetAge)}` : ''}.</p>
+                <p>Starting with ${formatCurrency(balance)} in investment portfolio. Your expenses (${formatCurrency(expenses)}/yr) outpace what your savings and income can sustain, so the FI target of ${formatCurrency(fiTargetAtRet)} can't be reached${includeRetAge ? ` before retirement at age ${formatNumber(plannedRetAge)}` : ` — even working to age ${formatNumber(75)}`}.${depletionAge ? ` On this plan the portfolio is exhausted around age ${formatNumber(depletionAge)}.` : ''}</p>
             </div>
         </li>` });
         if (includeRetAge) {
@@ -461,6 +463,16 @@ function calculateRetirement() {
             <div class="timeline-content">
                 <h4>OAS Starts (Age ${formatNumber(oasAge)})</h4>
                 <p>${describeIncomeAt(oasAge, expenses, benefits, isGCMode)}</p>
+            </div>
+        </li>` });
+        }
+        if (depletionAge) {
+            partialEvents.push({ age: depletionAge, html: `
+        <li class="timeline-item timeline-depleted">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>Savings Exhausted (Age ${formatNumber(depletionAge)})</h4>
+                <p>On this plan the portfolio runs out here. Beyond this point your guaranteed income (${formatCurrency(getRetirementIncome(depletionAge, benefits))}/yr) no longer covers your ${formatCurrency(expenses)}/yr of expenses. To make the plan work you'd need to spend less, earn more, save more, or delay retirement.</p>
             </div>
         </li>` });
         }

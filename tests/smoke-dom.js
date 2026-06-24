@@ -85,6 +85,25 @@ for (const sc of scenarios) {
     console.log(`✓ ${sc.name} — FI age ${fiAge}, status "${status}"`);
 }
 
+// Not-achievable case (income << expenses): the UI must report it plainly,
+// hide the detailed table, and show a "Savings Exhausted" milestone rather
+// than a phantom FI age.
+(function notAchievableUI() {
+    setChk('chkIncludePension', false);
+    setChk('chkIncludeRetAge', true); setVal('plannedRetirementAge', 45);
+    setVal('currentAge', 38); setVal('annualIncome', 50000); setVal('annualExpenses', 95000);
+    setChk('chkIncludePortfolio', true); setVal('currentBalance', 1000000);
+    const fiAgeTxt = read('resFIAge');
+    const status   = read('chartStatus');
+    const timeline = doc.querySelector('.timeline').innerHTML;
+    const statusOk   = /not achievable/i.test(status);
+    const fiTxtOk    = !/\b9\d(\.\d)?\b/.test(fiAgeTxt);        // not a bogus age in the 90s
+    const exhaustOk  = /Savings Exhausted/.test(timeline);
+    if (statusOk && fiTxtOk && exhaustOk)
+        console.log(`✓ not-achievable case: status "${status}", FI "${fiAgeTxt}", shows Savings Exhausted milestone`);
+    else { console.log(`✗ not-achievable case failed (status="${status}", fiAge="${fiAgeTxt}", exhaustMilestone=${exhaustOk})`); ok = false; }
+})();
+
 const reportHtml = doc.getElementById('reportPanel').innerHTML;
 if (/No passive income active/.test(reportHtml)) { console.log('✗ report still says "No passive income active"'); ok = false; }
 else console.log('✓ report free of stale "No passive income active" wording');
