@@ -104,6 +104,21 @@ for (const sc of scenarios) {
     else { console.log(`✗ not-achievable case failed (status="${status}", fiAge="${fiAgeTxt}", exhaustMilestone=${exhaustOk})`); ok = false; }
 })();
 
+// Portfolio-only user (no pension/CPP/OAS): the report must not claim
+// guaranteed income covers the bill or reference non-existent income sources.
+(function portfolioOnlyUI() {
+    setChk('chkIncludePension', false); setChk('chkIncludeCppOas', false); setChk('chkIncludeRetAge', false);
+    setVal('currentAge', 35); setVal('annualIncome', 120000); setVal('annualExpenses', 60000);
+    setChk('chkIncludePortfolio', true); setVal('currentBalance', 200000);
+    const rep = doc.getElementById('reportPanel').textContent;
+    const badGuaranteed = /guaranteed income covers most of the bill/i.test(rep);
+    const badGap        = /gap left after your income sources/i.test(rep);
+    const goodOwn       = /portfolio covers your full \$60,000\/yr of expenses on its own/i.test(rep);
+    if (!badGuaranteed && !badGap && goodOwn)
+        console.log('✓ portfolio-only report: portfolio-funds-it-all wording, no phantom income sources');
+    else { console.log(`✗ portfolio-only report wording (badGuaranteed=${badGuaranteed}, badGap=${badGap}, goodOwn=${goodOwn})`); ok = false; }
+})();
+
 const reportHtml = doc.getElementById('reportPanel').innerHTML;
 if (/No passive income active/.test(reportHtml)) { console.log('✗ report still says "No passive income active"'); ok = false; }
 else console.log('✓ report free of stale "No passive income active" wording');
