@@ -122,3 +122,30 @@ Always run `npm test` after touching `calc.js` or any calculation/wording in
 - `app.js` uses `.innerText` to write results; tests read `.innerText` too.
 - When no retirement date is set, `plannedRetAge` defaults to 100 (i.e. "work
   to the horizon"), so the projection equals the accumulation pass.
+
+## Decision Routing (When you update the notes)
+
+When a chat session produces bugs, decisions, or changes, **route them here:**
+
+| What was decided | Write it in AGENTS.md | Write it in Brain2 |
+|---|---|---|
+| Bug found | → Open Bugs | — |
+| New feature / phase added | → Pending Features | → Additional Requirements |
+| Fundamental principle changed | — | → Evergreen Requirements + Architecture Notes |
+| Operational gotcha / convention | → Conventions & gotchas | — |
+| Architecture decision (why X over Y) | — | → Architecture & Design Notes |
+| Code changed | (git commit only) | — |
+
+**End-of-session instruction to agents:**  
+> "Update the project notes with what we decided today."
+
+## Open Bugs
+*(Log bugs here as discovered)*
+- *(none logged)*
+
+## Pending Features / Decisions
+*(Log decisions and new feature requests here)*
+- Gather StatCan demographic data (income, spending by age/location/household/income)
+- Verify data harmonization across income & spending breakdowns
+- UI enhancements: collapsible assumptions, report-style view (separate tab)
+- Spending comparison: allow users to submit expense numbers by category
