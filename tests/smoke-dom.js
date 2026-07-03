@@ -96,7 +96,9 @@ for (const sc of scenarios) {
     const fiAgeTxt = read('resFIAge');
     const status   = read('chartStatus');
     const timeline = doc.querySelector('.timeline').innerHTML;
-    const statusOk   = /not achievable/i.test(status);
+    // A not-achievable plan that also depletes shows the loud depletion badge
+    // ("Savings run out at age X") — a sustainable one says "On track".
+    const statusOk   = /run out|not achievable/i.test(status);
     const fiTxtOk    = !/\b9\d(\.\d)?\b/.test(fiAgeTxt);        // not a bogus age in the 90s
     const exhaustOk  = /Savings Exhausted/.test(timeline);
     if (statusOk && fiTxtOk && exhaustOk)
