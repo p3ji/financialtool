@@ -64,8 +64,16 @@
 
     // ---- Required portfolio to be FI at `currentAge` ---------------
     // Works backward via present-value from the terminal age (last income
-    // transition). Returns the balance needed so the portfolio can bridge
-    // every expense gap from currentAge through age 100.
+    // transition). Returns the minimum balance needed so the portfolio can
+    // bridge every expense gap on the way to the terminal age and still
+    // hold the SWR target (terminal gap ÷ SWR) when it gets there.
+    //
+    // Months where passive income EXCEEDS expenses (e.g. pension + bridge
+    // above spending) are credited: the forward simulation reinvests those
+    // surpluses (invariant #2), so the requirement must recognise them too,
+    // or FI lands later than the simulation itself proves necessary. The
+    // requirement is floored at $0 each month — a portfolio can never go
+    // negative, so future surpluses can't be borrowed against today's gaps.
     function getRequiredBalanceAtAge(currentAge, expenses, swrDecimal, rMonthly, benefits) {
         const {
             pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0,
@@ -106,7 +114,7 @@
             if (cppAge < 999 && ageAtStep >= cppAge) income += cppAmount;
             if (oasAge < 999 && ageAtStep >= oasAge) income += oasAmount;
             income += rentalIncome;
-            req = (req + Math.max(0, expenses - income) / 12) / (1 + rMonthly);
+            req = Math.max(0, (req + (expenses - income) / 12) / (1 + rMonthly));
         }
 
         return req;
@@ -175,9 +183,15 @@
                 simData.push({ x: currentAge, y: bal });
             }
 
-            // FI check — portfolio can sustain withdrawals to 100 from here
+            // FI check — portfolio can sustain withdrawals from here. A
+            // crossing only counts while employment is still running
+            // (m <= monthsToEmpStop): FI age means "earliest you could
+            // afford to STOP working". A portfolio that merely coasts
+            // across the SWR threshold years after work already ended
+            // (high ROI outpacing the drawdown) is a phantom late-life
+            // "FI at 95" (invariant #6), not an achievable stop-work age.
             const required = getRequiredBalanceAtAge(currentAge, expenses, swrDecimal, rMonthly, benefits);
-            if (fiMonth === null && bal >= required) {
+            if (fiMonth === null && m <= monthsToEmpStop && bal >= required) {
                 fiMonth = m;
                 simData.push({ x: currentAge, y: bal });
             }
