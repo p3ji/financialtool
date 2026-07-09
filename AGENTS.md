@@ -33,7 +33,12 @@ Key exports:
   rental. `999` is the sentinel for a disabled source.
 - `getRequiredBalanceAtAge(age, expenses, swrDecimal, rMonthly, benefits)` —
   portfolio needed to be FI at `age`, via backward present-value from the last
-  income transition ("terminal age"). It only needs to cover expense **gaps**.
+  income transition ("terminal age"). It only needs to cover expense **gaps**,
+  and months where passive income *exceeds* expenses (e.g. pension + bridge
+  above spending) are **credited** — the forward simulation reinvests those
+  surpluses, so the requirement recognises them too. It is floored at $0 each
+  month: future surpluses can't be borrowed against today's deficits (a
+  portfolio may never go negative).
 - `runSimulation(params)` — one month-by-month pass. **Passive income is
   credited every month it is active**; surplus reinvests into the portfolio,
   deficits draw it down. Employment income is added only while working.
@@ -52,6 +57,12 @@ Key exports:
   `MAX_WORK_AGE` (currently **75**) is the single knob for "nobody works
   forever." Anyone who reaches FI *before* it is completely unaffected (their
   crossover month is identical); only the income-≤-expenses grinders change.
+  The FI **crossing itself must also happen while employment is still
+  running** (`m <= monthsToEmpStop` in `runSimulation`): a portfolio that
+  merely *coasts* across the SWR threshold decades after work stopped (high
+  ROI outpacing the drawdown) is not an achievable stop-work age — those
+  plans come back `fiMonth === null` and, when they survive to 100, show the
+  blue "On track" state instead of a phantom "FI at 95".
 - `describeIncomeAt(...)` / `describeFiPortfolio(...)` — shared narrative
   strings so the calculator timeline and the Report tab never contradict.
 

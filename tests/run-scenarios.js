@@ -408,6 +408,21 @@ for (const roi of [0, 2, 8]) {
         pensionAge: 60, lifetimePension: 100000 }));
     check('[notAchiev] sub-cap FI (Case 1) preserved at ~58.9',
         case1.fiAge !== null && Math.abs(case1.fiAge - 58.9) < 0.3, `fiAge=${case1.fiAge}`);
+
+    // High-ROI coaster: a dissaver (income < expenses) whose portfolio,
+    // thanks to ROI outpacing the drawdown, would eventually coast across
+    // the SWR threshold around age 95 — decades after employment stopped at
+    // MAX_WORK_AGE. That crossing is NOT an achievable stop-work age and
+    // must not be reported as "FI at 95". The plan does survive (ROI > the
+    // withdrawal), so it also must NOT be flagged as depleting.
+    const coaster = C.analyze(buildParams({
+        age: 53, income: 86000, expenses: 99000, balance: 313000,
+        pensionAge: 63, lifetimePension: 19000, bridgeBenefit: 16000,
+        roi: 7.4, swr: 3.8 }));
+    check('[notAchiev] post-75 coast across SWR threshold is not an FI age',
+        coaster.fiAge === null, `fiAge=${coaster.fiAge}`);
+    check('[notAchiev] coaster plan is sustainable — no depletion flag',
+        coaster.depletionAge === null, `depletionAge=${coaster.depletionAge}`);
 })();
 
 // ------------------------------------------------------------
@@ -471,6 +486,87 @@ for (const roi of [0, 2, 8]) {
         age: 35, income: 110000, expenses: 70000, balance: 50000 }));
     check('[retireBefore] no retirement date → no early-exit depletion',
         noRet.fiAge !== null && noRet.depletionAge === null, `depletionAge=${noRet.depletionAge}`);
+})();
+
+// ------------------------------------------------------------
+// 16. Required-balance ↔ simulation consistency.
+//     getRequiredBalanceAtAge must be the MINIMUM balance that lets a
+//     retiree (no employment) reach the terminal income transition without
+//     the portfolio ever going negative AND still hold the SWR target
+//     there — under the exact same monthly stepping the simulation uses
+//     (passive income credited, surpluses reinvested). Starting with the
+//     required balance must succeed; starting a few % below must fail.
+//     This pins the fix for over-stated FI targets when pension + bridge
+//     exceed expenses for a stretch (surpluses now credited).
+// ------------------------------------------------------------
+(function requiredConsistency() {
+    const rMonthly = 0.05 / 12, swrDecimal = 0.04;
+
+    function terminalInfo(expenses, benefits) {
+        const { pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0,
+                cppAge = 999, cppAmount = 0, oasAge = 999, oasAmount = 0,
+                rentalIncome = 0 } = benefits;
+        const t = [];
+        if (pensionAge < 999) { t.push(pensionAge); if (bridgeBenefit > 0 && pensionAge < 65) t.push(65); }
+        if (cppAge < 999) t.push(cppAge);
+        if (oasAge < 999) t.push(oasAge);
+        const terminalAge = t.length ? Math.max(...t) : null;
+        const terminalIncome = (pensionAge < 999 ? lifetimePension : 0) +
+            (cppAge < 999 ? cppAmount : 0) + (oasAge < 999 ? oasAmount : 0) + rentalIncome;
+        return { terminalAge, terminalPortfolio: Math.max(0, expenses - terminalIncome) / swrDecimal };
+    }
+
+    // Forward drawdown with the simulation's own monthly step.
+    function survivesRetirement(startAge, startBal, expenses, benefits) {
+        const { terminalAge, terminalPortfolio } = terminalInfo(expenses, benefits);
+        const months = terminalAge !== null && terminalAge > startAge
+            ? Math.round((terminalAge - startAge) * 12) : 0;
+        let bal = startBal;
+        for (let m = 0; m < months; m++) {
+            const a = startAge + m / 12;
+            bal = bal * (1 + rMonthly) + (C.getRetirementIncome(a, benefits) - expenses) / 12;
+            if (bal < -1e-6) return false;
+        }
+        return bal >= terminalPortfolio - 0.01;
+    }
+
+    const cases = [
+        ['gcSurplus',  70000, { pensionAge: 58, lifetimePension: 65000, bridgeBenefit: 10000 }],
+        ['gcFull',     70000, { pensionAge: 58, lifetimePension: 45000, bridgeBenefit: 12000,
+                                cppAge: 65, cppAmount: 14000, oasAge: 65, oasAmount: 8500 }],
+        ['penOnly',    81000, { pensionAge: 60, lifetimePension: 59000 }],
+        ['staggered',  60000, { pensionAge: 57, lifetimePension: 50000, bridgeBenefit: 14000,
+                                cppAge: 65, cppAmount: 8000 }],
+        ['rentalMix',  50000, { pensionAge: 60, lifetimePension: 20000, cppAge: 70, cppAmount: 5000,
+                                rentalIncome: 35000 }]
+    ];
+    for (const [name, expenses, ben] of cases) {
+        const benefits = { pensionAge: 999, lifetimePension: 0, bridgeBenefit: 0,
+                           cppAge: 999, cppAmount: 0, oasAge: 999, oasAmount: 0,
+                           rentalIncome: 0, ...ben };
+        for (const startAge of [45, 50, 56, 59, 63]) {
+            const req = C.getRequiredBalanceAtAge(startAge, expenses, swrDecimal, rMonthly, benefits);
+            check(`[reqCons/${name}@${startAge}] retiring on the required balance survives`,
+                survivesRetirement(startAge, req + 1, expenses, benefits),
+                `req=${req.toFixed(0)}`);
+            if (req > 1000) {
+                check(`[reqCons/${name}@${startAge}] required balance is minimal (3% less fails)`,
+                    !survivesRetirement(startAge, req * 0.97 - 500, expenses, benefits),
+                    `req=${req.toFixed(0)}`);
+            }
+        }
+    }
+
+    // Surplus crediting, isolated: same lifetime pension (same terminal gap),
+    // but a bigger bridge creates a 58→65 surplus over expenses. The
+    // requirement before the pension starts must be strictly LOWER — the
+    // surplus reinvests and pre-funds part of the post-65 gap.
+    const mkB = bridge => ({ pensionAge: 58, lifetimePension: 65000, bridgeBenefit: bridge,
+                             cppAge: 999, cppAmount: 0, oasAge: 999, oasAmount: 0, rentalIncome: 0 });
+    const reqFlat = C.getRequiredBalanceAtAge(50, 70000, swrDecimal, rMonthly, mkB(5000));  // 58–65 income = expenses
+    const reqRich = C.getRequiredBalanceAtAge(50, 70000, swrDecimal, rMonthly, mkB(15000)); // 58–65 surplus 10k/yr
+    check('[reqCons] pension surplus over expenses lowers the pre-pension FI target',
+        reqRich < reqFlat - 1000, `flat=${reqFlat.toFixed(0)} rich=${reqRich.toFixed(0)}`);
 })();
 
 // ------------------------------------------------------------
