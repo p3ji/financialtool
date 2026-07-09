@@ -33,7 +33,19 @@
         <main class="dashboard">
             <!-- Left Column: Inputs -->
             <section class="glass-panel inputs-section">
-                <h2>Your Financial Profile</h2>
+                <div class="section-title-row">
+                    <h2>Your Financial Profile</h2>
+                    <button type="button" class="help-icon-btn" id="btnProfileHelp" aria-label="Help: income and couples" aria-expanded="false">?</button>
+                </div>
+                <div class="help-popover" id="profileHelpPopover" role="dialog" hidden>
+                    <button type="button" class="help-popover-close" id="btnCloseProfileHelp" aria-label="Close">&times;</button>
+                    <h4>How do I estimate my post-tax income?</h4>
+                    <p>Use your take-home pay, not your salary. The easiest way: look at your pay stub and multiply your net deposit by the number of pay periods per year. This already accounts for income tax, CPP/QPP, and EI deductions.</p>
+                    <p>Federal public servants can estimate net pay with <a href="https://fedpay.ca/" target="_blank" rel="noopener">fedpay.ca</a> (independent, not affiliated).</p>
+                    <p>Enter only employment income here — investment and rental income belong in the <em>Investment Portfolio</em> section so they aren't double-counted.</p>
+                    <h4>I'm part of a couple — what do I enter?</h4>
+                    <p>Tick <strong>Planning as a couple</strong>. Income, expenses, and portfolio become combined <strong>household</strong> totals, and you can enter each partner's DB pension and CPP/OAS separately (with their own start ages) in those sections.</p>
+                </div>
 
                 <!-- Core: always visible -->
                 <div class="input-group">
@@ -71,6 +83,24 @@
                 </div>
 
                 <div class="divider"></div>
+
+                <!-- Optional: Planning as a couple -->
+                <div class="input-group checkbox-group">
+                    <label class="checkbox-wrapper">
+                        <input type="checkbox" id="chkCouple">
+                        <span class="checkbox-label">Planning as a couple</span>
+                    </label>
+                </div>
+                <div id="coupleSection" style="display: none;">
+                    <p class="couple-note optional-input">Income, expenses, and portfolio above are combined <strong>household</strong> totals. Add each partner's DB pension and CPP/OAS separately in the sections below.</p>
+                    <div class="input-group optional-input">
+                        <label for="partnerAge">Partner's Current Age</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="partnerAge" value="35" min="18" max="100">
+                            <span class="unit">Yrs</span>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Optional: Planned Retirement Date -->
                 <div class="input-group checkbox-group">
@@ -202,6 +232,24 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Partner's DB pension (shown only when planning as a couple) -->
+                    <div id="partnerPensionInputs" class="partner-block optional-input" style="display: none;">
+                        <div class="partner-block-label">Partner's DB Pension</div>
+                        <div class="input-group">
+                            <label for="partnerPensionAge">Age Partner's Pension Begins <span class="label-hint">partner's age</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="partnerPensionAge" value="60" min="40" max="80">
+                                <span class="unit">Yrs</span>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="partnerPensionAmount">Partner's Annual Pension <span class="label-hint">post-tax</span></label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="partnerPensionAmount" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Optional: CPP & OAS -->
@@ -242,6 +290,40 @@
                             <input type="number" id="oasAmountAt65" value="8700" min="0" step="100">
                         </div>
                     </div>
+                    <!-- Partner's CPP & OAS (shown only when planning as a couple) -->
+                    <div id="partnerCppOasInputs" class="partner-block optional-input" style="display: none;">
+                        <div class="partner-block-label">Partner's CPP &amp; OAS</div>
+                        <div class="input-group">
+                            <label for="partnerCppStartAge">Partner's CPP Start Age <span class="label-hint">partner's age</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="partnerCppStartAge" value="65" min="60" max="70">
+                                <span class="unit">Yrs</span>
+                            </div>
+                            <div id="partnerCppAdjNote" class="benefit-adj-note"></div>
+                        </div>
+                        <div class="input-group">
+                            <label for="partnerCppAmountAt65">Partner's Est. CPP at 65 <span class="label-hint">post-tax</span></label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="partnerCppAmountAt65" value="0" min="0" step="500">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="partnerOasStartAge">Partner's OAS Start Age <span class="label-hint">partner's age</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="partnerOasStartAge" value="65" min="65" max="70">
+                                <span class="unit">Yrs</span>
+                            </div>
+                            <div id="partnerOasAdjNote" class="benefit-adj-note"></div>
+                        </div>
+                        <div class="input-group">
+                            <label for="partnerOasAmountAt65">Partner's Est. OAS at 65 <span class="label-hint">post-tax</span></label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="partnerOasAmountAt65" value="0" min="0" step="100">
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="divider"></div>
@@ -270,6 +352,7 @@
                             <li>Primary residence excluded from portfolio; projections in today's dollars (real return handles inflation)</li>
                             <li>Portfolio target = (Annual Expenses − Passive Income) ÷ SWR% (the 4% Rule, Bengen 1994)</li>
                             <li>Annual income is post-tax; annual return is post-tax and inflation-adjusted</li>
+                            <li>Couples are modelled as one shared household portfolio; each partner's pension/CPP/OAS is credited at their own age. No mortality, survivor-benefit, or income-splitting tax effects are modelled.</li>
                             <li><a href="methodology.html" style="color: var(--accent-color); text-decoration: underline;">Read methodology</a> for detailed assumptions and data sources</li>
                         </ul>
                     </div>
@@ -443,6 +526,7 @@
             <p>Always consult a qualified financial advisor, Certified Financial Planner (CFP), tax professional, or other licensed financial professional before making any financial decisions. For federal public servants, consider consulting your departmental pension centre or a pension specialist familiar with the Public Service Superannuation Act (PSSA).</p>
             <p><strong>Privacy.</strong> All retirement calculations are performed locally within your browser. No financial data you enter is collected, stored, or transmitted by this calculator.</p>
             <p style="margin-top: 1.5rem; font-size: 0.9rem; border-top: 1px solid var(--panel-border); padding-top: 1rem;">Found a bug or have a feature suggestion? <button type="button" id="contactBtn" style="background: none; border: none; color: var(--accent-color); cursor: pointer; text-decoration: underline; font-size: inherit;">Send us a message.</button> We're actively adding features to make this tool more useful.</p>
+            <p style="margin-top: 1rem;"><a href="https://p3ji.github.io/portfolio/" target="_blank" rel="noopener" style="color: var(--accent-color);">More by Peter Jiao ↗</a></p>
         </div>
     </footer>
 

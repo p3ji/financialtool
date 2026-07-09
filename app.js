@@ -1516,3 +1516,34 @@ function rptAssumptions(d) {
         }
     });
 }());
+
+// Profile help popover (post-tax income + couples guidance)
+(function () {
+    const btn      = document.getElementById('btnProfileHelp');
+    const popover  = document.getElementById('profileHelpPopover');
+    const closeBtn = document.getElementById('btnCloseProfileHelp');
+
+    if (!btn || !popover || !closeBtn) return;
+
+    function openPopover() {
+        popover.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+    }
+    function closePopover() {
+        popover.hidden = true;
+        btn.setAttribute('aria-expanded', 'false');
+    }
+
+    btn.addEventListener('click', e => {
+        e.stopPropagation();
+        popover.hidden ? openPopover() : closePopover();
+    });
+    closeBtn.addEventListener('click', closePopover);
+
+    document.addEventListener('click', e => {
+        if (!popover.hidden && !popover.contains(e.target) && e.target !== btn) closePopover();
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && !popover.hidden) closePopover();
+    });
+}());

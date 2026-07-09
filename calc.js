@@ -47,19 +47,67 @@
 
     // ---- Passive (non-employment) income at a given age ------------
     // pension + CPP + OAS + rental. 999 is the sentinel for a disabled source.
-    function getRetirementIncome(age, benefits) {
-        const { pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0,
+    //
+    // COUPLES: a `benefits.partner` sub-object (same shape, minus rental) adds
+    // a second person's DB pension / CPP / OAS. The partner's start ages are
+    // pre-translated by app.js onto the PRIMARY person's age axis, so the whole
+    // engine keeps simulating on one timeline. `bridgeEndAge` (default 65) lets
+    // a partner's bridge — which ends at *their* 65 — land at the right point
+    // on that shared axis. For a single person there is no `partner` key and
+    // every result is byte-identical to before.
+    function incomeOf(age, b) {
+        if (!b) return 0;
+        const { pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0, bridgeEndAge = 65,
                 cppAge = 999, cppAmount = 0, oasAge = 999, oasAmount = 0,
-                rentalIncome = 0 } = benefits || {};
+                rentalIncome = 0 } = b;
         let income = 0;
         if (pensionAge < 999 && age >= pensionAge) {
             income += lifetimePension;
-            if (age < 65) income += bridgeBenefit;
+            if (age < bridgeEndAge) income += bridgeBenefit;
         }
         if (cppAge < 999 && age >= cppAge) income += cppAmount;
         if (oasAge < 999 && age >= oasAge) income += oasAmount;
         income += rentalIncome;
         return income;
+    }
+
+    function getRetirementIncome(age, benefits) {
+        return incomeOf(age, benefits) +
+               (benefits && benefits.partner ? incomeOf(age, benefits.partner) : 0);
+    }
+
+    // Income-transition ages for one person (pension start, bridge end, CPP, OAS).
+    function transitionAgesOf(b) {
+        if (!b) return [];
+        const { pensionAge = 999, bridgeBenefit = 0, bridgeEndAge = 65,
+                cppAge = 999, oasAge = 999 } = b;
+        const ages = [];
+        if (pensionAge < 999) {
+            ages.push(pensionAge);
+            if (bridgeBenefit > 0 && pensionAge < bridgeEndAge) ages.push(bridgeEndAge);
+        }
+        if (cppAge < 999) ages.push(cppAge);
+        if (oasAge < 999) ages.push(oasAge);
+        return ages;
+    }
+
+    // Steady-state income for one person once all sources are active (post-bridge).
+    function terminalIncomeOf(b) {
+        if (!b) return 0;
+        const { pensionAge = 999, lifetimePension = 0, cppAge = 999, cppAmount = 0,
+                oasAge = 999, oasAmount = 0, rentalIncome = 0 } = b;
+        return (pensionAge < 999 ? lifetimePension : 0) +
+               (cppAge   < 999 ? cppAmount         : 0) +
+               (oasAge   < 999 ? oasAmount         : 0) +
+               rentalIncome;
+    }
+
+    // Combined income-transition ages for the household (self + partner).
+    function allTransitionAges(benefits) {
+        return [
+            ...transitionAgesOf(benefits),
+            ...transitionAgesOf(benefits && benefits.partner)
+        ];
     }
 
     // ---- Required portfolio to be FI at `currentAge` ---------------
@@ -75,27 +123,11 @@
     // requirement is floored at $0 each month — a portfolio can never go
     // negative, so future surpluses can't be borrowed against today's gaps.
     function getRequiredBalanceAtAge(currentAge, expenses, swrDecimal, rMonthly, benefits) {
-        const {
-            pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0,
-            cppAge = 999, cppAmount = 0,
-            oasAge = 999, oasAmount = 0,
-            rentalIncome = 0
-        } = benefits || {};
-
-        const terminalIncome = (pensionAge < 999 ? lifetimePension : 0) +
-                               (cppAge   < 999 ? cppAmount         : 0) +
-                               (oasAge   < 999 ? oasAmount         : 0) +
-                               rentalIncome;
+        const partner = benefits && benefits.partner;
+        const terminalIncome = terminalIncomeOf(benefits) + terminalIncomeOf(partner);
         const terminalPortfolio = Math.max(0, expenses - terminalIncome) / swrDecimal;
 
-        const transitionAges = [];
-        if (pensionAge < 999) {
-            transitionAges.push(pensionAge);
-            if (bridgeBenefit > 0 && pensionAge < 65) transitionAges.push(65);
-        }
-        if (cppAge < 999) transitionAges.push(cppAge);
-        if (oasAge < 999) transitionAges.push(oasAge);
-
+        const transitionAges = allTransitionAges(benefits);
         if (transitionAges.length === 0) return terminalPortfolio;
 
         const terminalAge = Math.max(...transitionAges);
@@ -106,14 +138,10 @@
 
         for (let i = 1; i <= monthsToTerminal; i++) {
             const ageAtStep = terminalAge - (i / 12);
-            let income = 0;
-            if (pensionAge < 999 && ageAtStep >= pensionAge) {
-                income += lifetimePension;
-                if (ageAtStep < 65) income += bridgeBenefit;
-            }
-            if (cppAge < 999 && ageAtStep >= cppAge) income += cppAmount;
-            if (oasAge < 999 && ageAtStep >= oasAge) income += oasAmount;
-            income += rentalIncome;
+            // Credit surpluses (income may exceed expenses), then floor the
+            // running requirement at $0 — a portfolio can never go negative,
+            // so future surpluses can't offset today's gaps.
+            const income = getRetirementIncome(ageAtStep, benefits);
             req = Math.max(0, (req + (expenses - income) / 12) / (1 + rMonthly));
         }
 
@@ -154,6 +182,10 @@
         const simData = [];
         const yearlyData = [];
 
+        // Sample the chart at every income kink (self + partner) so the line
+        // bends cleanly where a source starts or a bridge ends.
+        const transitionAges = allTransitionAges(benefits);
+
         let sumIncome = 0, sumExpenses = 0, sumROI = 0;
         let startBalOfYear = balance;
         let currentYearAge = Math.floor(age);
@@ -173,12 +205,10 @@
             const currentAge = age + m / 12;
             const isWorking  = m < monthsToEmpStop;
 
-            // Key chart points: yearly + transitions
+            // Key chart points: yearly + income transitions (self + partner)
             if (m % 12 === 0 ||
                 m === monthsToEmpStop ||
-                (benefits.pensionAge < 999 && Math.abs(currentAge - benefits.pensionAge) < 0.05) ||
-                (benefits.cppAge     < 999 && Math.abs(currentAge - benefits.cppAge)     < 0.05) ||
-                (benefits.oasAge     < 999 && Math.abs(currentAge - benefits.oasAge)     < 0.05) ||
+                transitionAges.some(a => Math.abs(currentAge - a) < 0.05) ||
                 Math.abs(currentAge - 65) < 0.05) {
                 simData.push({ x: currentAge, y: bal });
             }
@@ -328,26 +358,38 @@
 
     // Describes the active income sources at a given age and how much the
     // portfolio must cover. `gcMode` toggles the GC bridge-benefit wording.
-    function describeIncomeAt(age, expenses, benefits, gcMode) {
-        const { pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0,
+    // Active-source phrases for one person. `label` prefixes couple sources
+    // ("Your " / "Partner's "); empty for a single person.
+    function sourcePartsOf(age, b, label, gcMode) {
+        if (!b) return [];
+        const { pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0, bridgeEndAge = 65,
                 cppAge = 999, cppAmount = 0, oasAge = 999, oasAmount = 0,
-                rentalIncome = 0 } = benefits;
-
+                rentalIncome = 0 } = b;
         const parts = [];
         if (pensionAge < 999 && age >= pensionAge) {
             if (gcMode && bridgeBenefit > 0) {
-                if (age < 65) {
-                    parts.push(`DB Pension: ${formatCurrency(lifetimePension + bridgeBenefit)}/yr (${formatCurrency(lifetimePension)} lifetime + ${formatCurrency(bridgeBenefit)} bridge, ends at 65)`);
+                if (age < bridgeEndAge) {
+                    parts.push(`${label}DB Pension: ${formatCurrency(lifetimePension + bridgeBenefit)}/yr (${formatCurrency(lifetimePension)} lifetime + ${formatCurrency(bridgeBenefit)} bridge, ends at 65)`);
                 } else {
-                    parts.push(`DB Pension: ${formatCurrency(lifetimePension)}/yr (lifetime only — bridge ended at 65)`);
+                    parts.push(`${label}DB Pension: ${formatCurrency(lifetimePension)}/yr (lifetime only — bridge ended at 65)`);
                 }
             } else {
-                parts.push(`DB Pension: ${formatCurrency(lifetimePension)}/yr`);
+                parts.push(`${label}DB Pension: ${formatCurrency(lifetimePension)}/yr`);
             }
         }
-        if (cppAge < 999 && age >= cppAge) parts.push(`CPP: ${formatCurrency(cppAmount)}/yr`);
-        if (oasAge < 999 && age >= oasAge) parts.push(`OAS: ${formatCurrency(oasAmount)}/yr`);
+        if (cppAge < 999 && age >= cppAge) parts.push(`${label}CPP: ${formatCurrency(cppAmount)}/yr`);
+        if (oasAge < 999 && age >= oasAge) parts.push(`${label}OAS: ${formatCurrency(oasAmount)}/yr`);
         if (rentalIncome > 0)              parts.push(`Rental: ${formatCurrency(rentalIncome)}/yr`);
+        return parts;
+    }
+
+    function describeIncomeAt(age, expenses, benefits, gcMode) {
+        const partner = benefits && benefits.partner;
+        // With a partner, distinguish whose source is whose; solo stays unlabelled.
+        const parts = partner
+            ? [...sourcePartsOf(age, benefits, 'Your ', gcMode),
+               ...sourcePartsOf(age, partner, "Partner's ", gcMode)]
+            : sourcePartsOf(age, benefits, '', gcMode);
 
         const totalIncome = getRetirementIncome(age, benefits);
         const gap = Math.max(0, expenses - totalIncome);
@@ -374,26 +416,20 @@
     //   3. FI reached BEFORE some income sources start → portfolio BRIDGES
     //      expenses until those sources kick in (NOT a steady-SWR situation)
     function describeFiPortfolio(fiAge, expenses, benefits, fiPortfolio, swr, swrDecimal) {
-        const { pensionAge = 999, lifetimePension = 0, bridgeBenefit = 0,
-                cppAge = 999, cppAmount = 0, oasAge = 999, oasAmount = 0,
-                rentalIncome = 0 } = benefits;
+        const partner = benefits && benefits.partner;
 
         const netExpAtFI = Math.max(0, expenses - getRetirementIncome(fiAge, benefits));
 
-        const transitionAges = [];
-        if (pensionAge < 999) { transitionAges.push(pensionAge); if (bridgeBenefit > 0 && pensionAge < 65) transitionAges.push(65); }
-        if (cppAge < 999) transitionAges.push(cppAge);
-        if (oasAge < 999) transitionAges.push(oasAge);
+        const transitionAges = allTransitionAges(benefits);
         const terminalAge = transitionAges.length ? Math.max(...transitionAges) : 0;
         const allSourcesActiveAtFI = terminalAge === 0 || fiAge >= terminalAge;
 
-        const terminalIncome = (pensionAge < 999 ? lifetimePension : 0) +
-                               (cppAge    < 999 ? cppAmount        : 0) +
-                               (oasAge    < 999 ? oasAmount        : 0) + rentalIncome;
+        const terminalIncome = terminalIncomeOf(benefits) + terminalIncomeOf(partner);
         const terminalGap = Math.max(0, expenses - terminalIncome);
 
         // Are there any guaranteed (non-portfolio) income sources at all?
-        const hasAnySource = pensionAge < 999 || cppAge < 999 || oasAge < 999 || rentalIncome > 0;
+        const hasAnySource = transitionAges.length > 0 ||
+                             (benefits && benefits.rentalIncome > 0);
 
         if (netExpAtFI === 0 && allSourcesActiveAtFI) {
             return `Income sources fully cover all expenses at this age — no portfolio drawdown needed.`;

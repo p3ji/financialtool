@@ -912,6 +912,86 @@ header h1 span {
     margin-left: 1.5rem;
 }
 
+/* Section title row + inline help icon */
+.section-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+}
+.section-title-row h2 {
+    margin: 0;
+}
+.help-icon-btn {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    border-radius: 50%;
+    border: 1px solid var(--panel-border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.help-icon-btn:hover,
+.help-icon-btn[aria-expanded="true"] {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: #fff;
+}
+
+.help-popover {
+    position: relative;
+    margin: 0.6rem 0 1rem 0;
+    padding: 1rem 1.1rem;
+    background: rgba(20, 26, 41, 0.92);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.help-popover[hidden] {
+    display: none;
+}
+.help-popover h4 {
+    margin: 0 0 0.3rem 0;
+    font-size: 0.85rem;
+    color: var(--text-main);
+}
+.help-popover h4:not(:first-child) {
+    margin-top: 0.85rem;
+}
+.help-popover p {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+.help-popover p:last-child {
+    margin-bottom: 0;
+}
+.help-popover-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.6rem;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.2rem;
+}
+.help-popover-close:hover {
+    color: var(--text-main);
+}
+
 /* Collapsible assumptions */
 .assumptions-details {
     border: none;
