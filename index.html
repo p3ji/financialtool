@@ -31,68 +31,275 @@
         </header>
 
         <main class="dashboard">
-            <!-- Left Column: Inputs -->
-            <section class="glass-panel inputs-section">
-                <div class="section-title-row">
-                    <h2>Your Financial Profile</h2>
-                    <button type="button" class="help-icon-btn" id="btnProfileHelp" aria-label="Help: income and couples" aria-expanded="false">?</button>
-                </div>
-                <div class="help-popover" id="profileHelpPopover" role="dialog" hidden>
-                    <button type="button" class="help-popover-close" id="btnCloseProfileHelp" aria-label="Close">&times;</button>
-                    <h4>How do I estimate my post-tax income?</h4>
-                    <p>Use your take-home pay, not your salary. The easiest way: look at your pay stub and multiply your net deposit by the number of pay periods per year. This already accounts for income tax, CPP/QPP, and EI deductions.</p>
-                    <p>Federal public servants can estimate net pay with <a href="https://fedpay.ca/" target="_blank" rel="noopener">fedpay.ca</a> (independent, not affiliated).</p>
-                    <p>Enter only employment income here — investment and rental income belong in the <em>Investment Portfolio</em> section so they aren't double-counted.</p>
-                    <h4>I'm part of a couple — what do I enter?</h4>
-                    <p>Tick <strong>Planning as a couple</strong>. Income, expenses, and portfolio become combined <strong>household</strong> totals, and you can enter each partner's DB pension and CPP/OAS separately (with their own start ages) in those sections.</p>
-                </div>
-
-                <!-- Core: always visible -->
-                <div class="input-group">
-                    <label for="currentAge">Current Age</label>
-                    <div class="input-wrapper">
-                        <input type="number" id="currentAge" value="35" min="18" max="100">
-                        <span class="unit">Yrs</span>
+            <!-- Left Column: Inputs Container -->
+            <div class="inputs-column-container" id="inputsColumnContainer">
+                <section class="glass-panel inputs-section">
+                    <div class="section-title-row">
+                        <h2>Your Financial Profile</h2>
+                        <button type="button" class="help-icon-btn" id="btnProfileHelp" aria-label="Help: income and couples" aria-expanded="false">?</button>
                     </div>
-                </div>
-
-                <div class="input-group">
-                    <label for="annualIncome">Annual Income <span class="label-hint">post-tax</span></label>
-                    <div class="input-wrapper">
-                        <span class="currency">$</span>
-                        <input type="number" id="annualIncome" value="" min="0" step="1000">
+                    <div class="help-popover" id="profileHelpPopover" role="dialog" hidden>
+                        <button type="button" class="help-popover-close" id="btnCloseProfileHelp" aria-label="Close">&times;</button>
+                        <h4>How do I estimate my post-tax income?</h4>
+                        <p>Use your take-home pay, not your salary. The easiest way: look at your pay stub and multiply your net deposit by the number of pay periods per year. This already accounts for income tax, CPP/QPP, and EI deductions.</p>
+                        <p>Federal public servants can estimate net pay with <a href="https://fedpay.ca/" target="_blank" rel="noopener">fedpay.ca</a> (independent, not affiliated).</p>
+                        <p>Enter only employment income here — investment and rental income belong in the <em>Investment Portfolio</em> section so they aren't double-counted.</p>
+                        <h4>I'm part of a couple — what do I enter?</h4>
+                        <p>Tick <strong>Planning as a couple</strong> to open the <strong>Spouse / Partner Profile</strong> box. You can enter each partner's employment income, retirement age, DB pension, and CPP/OAS independently on their own timelines.</p>
                     </div>
-                </div>
 
-                <div class="input-group">
-                    <label for="annualExpenses">Annual Expenses</label>
-                    <div class="input-wrapper">
-                        <span class="currency">$</span>
-                        <input type="number" id="annualExpenses" value="" min="0" step="1000">
-                    </div>
-                    <div class="savings-summary-box" id="savingsSummaryBox">
-                        <div class="savings-metric">
-                            <span class="metric-label">Annual Savings</span>
-                            <span class="metric-val" id="profileAnnualSavings">--</span>
-                        </div>
-                        <div class="savings-metric">
-                            <span class="metric-label">Savings Rate</span>
-                            <span class="metric-val" id="profileSavingsRate">--</span>
+                    <!-- Core: always visible -->
+                    <div class="input-group">
+                        <label for="currentAge">Current Age</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="currentAge" value="35" min="18" max="100">
+                            <span class="unit">Yrs</span>
                         </div>
                     </div>
-                </div>
 
-                <div class="divider"></div>
+                    <div class="input-group">
+                        <label for="annualIncome">Annual Income <span class="label-hint">post-tax</span></label>
+                        <div class="input-wrapper">
+                            <span class="currency">$</span>
+                            <input type="number" id="annualIncome" value="" min="0" step="1000">
+                        </div>
+                    </div>
 
-                <!-- Optional: Planning as a couple -->
-                <div class="input-group checkbox-group">
-                    <label class="checkbox-wrapper">
-                        <input type="checkbox" id="chkCouple">
-                        <span class="checkbox-label">Planning as a couple</span>
-                    </label>
-                </div>
-                <div id="coupleSection" style="display: none;">
-                    <p class="couple-note optional-input">Income, expenses, and portfolio above are combined <strong>household</strong> totals. Add each partner's DB pension and CPP/OAS separately in the sections below.</p>
+                    <div class="input-group">
+                        <label for="annualExpenses">Annual Expenses</label>
+                        <div class="input-wrapper">
+                            <span class="currency">$</span>
+                            <input type="number" id="annualExpenses" value="" min="0" step="1000">
+                        </div>
+                        <div class="savings-summary-box" id="savingsSummaryBox">
+                            <div class="savings-metric">
+                                <span class="metric-label">Annual Savings</span>
+                                <span class="metric-val" id="profileAnnualSavings">--</span>
+                            </div>
+                            <div class="savings-metric">
+                                <span class="metric-label">Savings Rate</span>
+                                <span class="metric-val" id="profileSavingsRate">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <!-- Optional: Planning as a couple -->
+                    <div class="input-group checkbox-group">
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" id="chkCouple">
+                            <span class="checkbox-label">Planning as a couple</span>
+                        </label>
+                    </div>
+
+                    <!-- Optional: Planned Retirement Date -->
+                    <div class="input-group checkbox-group">
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" id="chkIncludeRetAge">
+                            <span class="checkbox-label">Add Planned Retirement Date</span>
+                        </label>
+                    </div>
+                    <div id="retAgeSection" style="display: none;">
+                        <div class="input-group optional-input">
+                            <label for="plannedRetirementAge">Planned Retirement Age <span class="label-hint">when you stop working</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="plannedRetirementAge" value="55" min="18" max="100">
+                                <span class="unit">Yrs</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Optional: Investment Portfolio -->
+                    <div class="input-group checkbox-group">
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" id="chkIncludePortfolio">
+                            <span class="checkbox-label">Add Investment Portfolio</span>
+                        </label>
+                    </div>
+                    <div id="portfolioSection" style="display: none;">
+                        <div class="mode-toggle optional-input">
+                            <button type="button" class="toggle-btn active" id="btnPortfolioSimple">Simple</button>
+                            <button type="button" class="toggle-btn" id="btnPortfolioDetailed">Detailed</button>
+                        </div>
+
+                        <div id="simplePortfolioInputs">
+                            <div class="input-group optional-input">
+                                <label for="currentBalance">Current Portfolio Balance</label>
+                                <div class="input-wrapper">
+                                    <span class="currency">$</span>
+                                    <input type="number" id="currentBalance" value="100000" min="0" step="1000">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="detailedPortfolioInputs" style="display: none;">
+                            <div class="input-group optional-input">
+                                <label for="rrspBalance">RRSP Balance</label>
+                                <div class="input-wrapper">
+                                    <span class="currency">$</span>
+                                    <input type="number" id="rrspBalance" value="0" min="0" step="1000">
+                                </div>
+                            </div>
+                            <div class="input-group optional-input">
+                                <label for="tfsaBalance">TFSA Balance</label>
+                                <div class="input-wrapper">
+                                    <span class="currency">$</span>
+                                    <input type="number" id="tfsaBalance" value="0" min="0" step="1000">
+                                </div>
+                            </div>
+                            <div class="input-group optional-input">
+                                <label for="nonRegBalance">Non-Registered Savings</label>
+                                <div class="input-wrapper">
+                                    <span class="currency">$</span>
+                                    <input type="number" id="nonRegBalance" value="0" min="0" step="1000">
+                                </div>
+                            </div>
+                            <div class="input-group optional-input">
+                                <label for="incPropValue">Income Property Value</label>
+                                <div class="input-wrapper">
+                                    <span class="currency">$</span>
+                                    <input type="number" id="incPropValue" value="0" min="0" step="1000">
+                                </div>
+                            </div>
+                            <div class="input-group optional-input">
+                                <label for="rentalIncome">Annual Rental Income <span class="label-hint">net post-tax</span></label>
+                                <div class="input-wrapper">
+                                    <span class="currency">$</span>
+                                    <input type="number" id="rentalIncome" value="0" min="0" step="1000">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Optional: DB Pension Plan -->
+                    <div class="input-group checkbox-group">
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" id="chkIncludePension">
+                            <span class="checkbox-label">Add DB Pension Plan</span>
+                        </label>
+                    </div>
+
+                    <!-- Pension Details Container -->
+                    <div id="pensionDetailsSection" style="display: none;">
+                        <div class="mode-toggle optional-input">
+                            <button type="button" class="toggle-btn active" id="btnSimpleMode">Simple DB</button>
+                            <button type="button" class="toggle-btn" id="btnGCMode">MyGCPension</button>
+                        </div>
+
+                        <div id="simpleDbInputs">
+                            <div class="input-group optional-input">
+                                <label for="pensionAge">Age Pension Begins</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="pensionAge" value="60" min="40" max="80">
+                                    <span class="unit">Yrs</span>
+                                </div>
+                            </div>
+
+                            <div class="input-group optional-input">
+                                <label for="pensionAmount">DB Pension Annual Amount <span class="label-hint">post-tax</span></label>
+                                <div class="input-wrapper">
+                                    <span class="currency">$</span>
+                                    <input type="number" id="pensionAmount" value="30000" min="0" step="1000">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="gcDbInputs" style="display: none;">
+                            <div class="input-group optional-input">
+                                <label for="gcPensionAge">Age Pension Begins</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="gcPensionAge" value="60" min="40" max="80">
+                                    <span class="unit">Yrs</span>
+                                </div>
+                            </div>
+
+                            <div class="input-group optional-input">
+                                <label for="gcLifetimePension">Annual Lifetime Pension <span class="label-hint">post-tax</span></label>
+                                <div class="input-wrapper">
+                                    <span class="currency">$</span>
+                                    <input type="number" id="gcLifetimePension" value="20000" min="0" step="1000">
+                                </div>
+                            </div>
+
+                            <div class="input-group optional-input">
+                                <label for="gcBridgeBenefit">Annual Bridge Benefit <span class="label-hint">stops at 65</span></label>
+                                <div class="input-wrapper">
+                                    <span class="currency">$</span>
+                                    <input type="number" id="gcBridgeBenefit" value="10000" min="0" step="1000">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Optional: CPP & OAS -->
+                    <div class="input-group checkbox-group">
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" id="chkIncludeCppOas">
+                            <span class="checkbox-label">Add CPP &amp; OAS</span>
+                        </label>
+                    </div>
+                    <div id="cppOasSection" style="display: none;">
+                        <div class="input-group optional-input">
+                            <label for="cppStartAge">CPP Start Age <span class="label-hint">60 = −36% &nbsp;|&nbsp; 65 = standard &nbsp;|&nbsp; 70 = +42%</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="cppStartAge" value="65" min="60" max="70">
+                                <span class="unit">Yrs</span>
+                            </div>
+                            <div id="cppAdjNote" class="benefit-adj-note"></div>
+                        </div>
+                        <div class="input-group optional-input">
+                            <label for="cppAmountAt65">Est. CPP at Age 65 <span class="label-hint">post-tax · from Service Canada statement</span></label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="cppAmountAt65" value="12000" min="0" step="500">
+                            </div>
+                        </div>
+                        <div class="input-group optional-input">
+                            <label for="oasStartAge">OAS Start Age <span class="label-hint">65 = standard &nbsp;|&nbsp; 70 = +36%</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="oasStartAge" value="65" min="65" max="70">
+                                <span class="unit">Yrs</span>
+                            </div>
+                            <div id="oasAdjNote" class="benefit-adj-note"></div>
+                        </div>
+                        <div class="input-group optional-input">
+                            <label for="oasAmountAt65">Est. OAS at Age 65 <span class="label-hint">post-tax · max 2025: ~$8,700/yr</span></label>
+                            <div class="input-wrapper">
+                                <span class="currency">$</span>
+                                <input type="number" id="oasAmountAt65" value="8700" min="0" step="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="divider"></div>
+                    <h2>Assumptions</h2>
+
+                    <div class="input-group-row">
+                        <div class="input-group half">
+                            <label for="roi">Annual Return</label>
+                            <div class="input-wrapper">
+                                <input type="number" id="roi" value="5.0" min="0" max="20" step="0.1">
+                                <span class="unit">%</span>
+                            </div>
+                        </div>
+                        <div class="input-group half">
+                            <label for="swr">Withdrawal Rate</label>
+                            <div class="input-wrapper">
+                                <input type="number" id="swr" value="4.0" min="1" max="10" step="0.1">
+                                <span class="unit">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Dedicated Spouse / Partner Profile Glass Panel -->
+                <section class="glass-panel spouse-inputs-section" id="spouseProfilePanel" style="display: none;">
+                    <div class="section-title-row">
+                        <h2>Spouse / Partner Profile</h2>
+                    </div>
+                    <p class="couple-note optional-input">Enter details for your spouse/partner. Their employment income and pensions are tracked on their own timeline.</p>
+                    
                     <div class="input-group optional-input">
                         <label for="partnerAge">Partner's Current Age</label>
                         <div class="input-wrapper">
@@ -100,141 +307,29 @@
                             <span class="unit">Yrs</span>
                         </div>
                     </div>
-                </div>
 
-                <!-- Optional: Planned Retirement Date -->
-                <div class="input-group checkbox-group">
-                    <label class="checkbox-wrapper">
-                        <input type="checkbox" id="chkIncludeRetAge">
-                        <span class="checkbox-label">Add Planned Retirement Date</span>
-                    </label>
-                </div>
-                <div id="retAgeSection" style="display: none;">
                     <div class="input-group optional-input">
-                        <label for="plannedRetirementAge">Planned Retirement Age <span class="label-hint">when you stop working</span></label>
+                        <label for="partnerIncome">Partner's Annual Income <span class="label-hint">post-tax</span></label>
                         <div class="input-wrapper">
-                            <input type="number" id="plannedRetirementAge" value="55" min="18" max="100">
-                            <span class="unit">Yrs</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Optional: Investment Portfolio -->
-                <div class="input-group checkbox-group">
-                    <label class="checkbox-wrapper">
-                        <input type="checkbox" id="chkIncludePortfolio">
-                        <span class="checkbox-label">Add Investment Portfolio</span>
-                    </label>
-                </div>
-                <div id="portfolioSection" style="display: none;">
-                    <div class="mode-toggle optional-input">
-                        <button type="button" class="toggle-btn active" id="btnPortfolioSimple">Simple</button>
-                        <button type="button" class="toggle-btn" id="btnPortfolioDetailed">Detailed</button>
-                    </div>
-
-                    <div id="simplePortfolioInputs">
-                        <div class="input-group optional-input">
-                            <label for="currentBalance">Current Portfolio Balance</label>
-                            <div class="input-wrapper">
-                                <span class="currency">$</span>
-                                <input type="number" id="currentBalance" value="100000" min="0" step="1000">
-                            </div>
+                            <span class="currency">$</span>
+                            <input type="number" id="partnerIncome" value="0" min="0" step="1000">
                         </div>
                     </div>
 
-                    <div id="detailedPortfolioInputs" style="display: none;">
+                    <div id="partnerRetAgeSection" style="display: none;">
                         <div class="input-group optional-input">
-                            <label for="rrspBalance">RRSP Balance</label>
+                            <label for="partnerPlannedRetAge">Partner's Planned Retirement Age <span class="label-hint">when partner stops working</span></label>
                             <div class="input-wrapper">
-                                <span class="currency">$</span>
-                                <input type="number" id="rrspBalance" value="0" min="0" step="1000">
-                            </div>
-                        </div>
-                        <div class="input-group optional-input">
-                            <label for="tfasaBalance">TFSA Balance</label>
-                            <div class="input-wrapper">
-                                <span class="currency">$</span>
-                                <input type="number" id="tfasaBalance" value="0" min="0" step="1000">
-                            </div>
-                        </div>
-                        <div class="input-group optional-input">
-                            <label for="nonRegBalance">Non-Registered Balance</label>
-                            <div class="input-wrapper">
-                                <span class="currency">$</span>
-                                <input type="number" id="nonRegBalance" value="0" min="0" step="1000">
-                            </div>
-                        </div>
-                        <div class="input-group optional-input">
-                            <label for="incomePropertyValue">Income Property Value</label>
-                            <div class="input-wrapper">
-                                <span class="currency">$</span>
-                                <input type="number" id="incomePropertyValue" value="0" min="0" step="1000">
-                            </div>
-                        </div>
-                        <div class="input-group optional-input">
-                            <label for="rentalIncome">Annual Rental Income <span class="label-hint">net of expenses</span></label>
-                            <div class="input-wrapper">
-                                <span class="currency">$</span>
-                                <input type="number" id="rentalIncome" value="0" min="0" step="1000">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Optional: DB Pension -->
-                <div class="input-group checkbox-group">
-                    <label class="checkbox-wrapper">
-                        <input type="checkbox" id="chkIncludePension">
-                        <span class="checkbox-label">Add DB Pension Plan</span>
-                    </label>
-                </div>
-                <div id="pensionDetailsSection" style="display: none;">
-                    <div class="mode-toggle optional-input">
-                        <button type="button" class="toggle-btn active" id="btnSimpleMode">Simple DB</button>
-                        <button type="button" class="toggle-btn" id="btnGCMode">MyGCPension</button>
-                    </div>
-                    <div id="simpleDbInputs">
-                        <div class="input-group optional-input">
-                            <label for="pensionAge">Age Pension Begins</label>
-                            <div class="input-wrapper">
-                                <input type="number" id="pensionAge" value="60" min="40" max="80">
+                                <input type="number" id="partnerPlannedRetAge" value="55" min="18" max="100">
                                 <span class="unit">Yrs</span>
                             </div>
                         </div>
-                        <div class="input-group optional-input">
-                            <label for="pensionAmount">Annual Pension Amount <span class="label-hint">post-tax</span></label>
-                            <div class="input-wrapper">
-                                <span class="currency">$</span>
-                                <input type="number" id="pensionAmount" value="30000" min="0" step="1000">
-                            </div>
-                        </div>
                     </div>
-                    <div id="gcDbInputs" style="display: none;">
-                        <div class="input-group optional-input">
-                            <label for="gcPensionAge">Age Pension Begins</label>
-                            <div class="input-wrapper">
-                                <input type="number" id="gcPensionAge" value="60" min="40" max="80">
-                                <span class="unit">Yrs</span>
-                            </div>
-                        </div>
-                        <div class="input-group optional-input">
-                            <label for="gcLifetimePension">Annual Lifetime Pension</label>
-                            <div class="input-wrapper">
-                                <span class="currency">$</span>
-                                <input type="number" id="gcLifetimePension" value="20000" min="0" step="1000">
-                            </div>
-                        </div>
-                        <div class="input-group optional-input">
-                            <label for="gcBridgeBenefit">Annual Bridge Benefit <span class="label-hint">stops at 65</span></label>
-                            <div class="input-wrapper">
-                                <span class="currency">$</span>
-                                <input type="number" id="gcBridgeBenefit" value="10000" min="0" step="1000">
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Partner's DB pension (shown only when planning as a couple) -->
+
+                    <!-- Partner's DB pension -->
                     <div id="partnerPensionInputs" class="partner-block optional-input" style="display: none;">
-                        <div class="partner-block-label">Partner's DB Pension</div>
+                        <div class="divider"></div>
+                        <h3>Partner's DB Pension</h3>
                         <div class="input-group">
                             <label for="partnerPensionAge">Age Partner's Pension Begins <span class="label-hint">partner's age</span></label>
                             <div class="input-wrapper">
@@ -250,49 +345,11 @@
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Optional: CPP & OAS -->
-                <div class="input-group checkbox-group">
-                    <label class="checkbox-wrapper">
-                        <input type="checkbox" id="chkIncludeCppOas">
-                        <span class="checkbox-label">Add CPP &amp; OAS</span>
-                    </label>
-                </div>
-                <div id="cppOasSection" style="display: none;">
-                    <div class="input-group optional-input">
-                        <label for="cppStartAge">CPP Start Age <span class="label-hint">60 = −36% &nbsp;|&nbsp; 65 = standard &nbsp;|&nbsp; 70 = +42%</span></label>
-                        <div class="input-wrapper">
-                            <input type="number" id="cppStartAge" value="65" min="60" max="70">
-                            <span class="unit">Yrs</span>
-                        </div>
-                        <div id="cppAdjNote" class="benefit-adj-note"></div>
-                    </div>
-                    <div class="input-group optional-input">
-                        <label for="cppAmountAt65">Est. CPP at Age 65 <span class="label-hint">post-tax · from Service Canada statement</span></label>
-                        <div class="input-wrapper">
-                            <span class="currency">$</span>
-                            <input type="number" id="cppAmountAt65" value="12000" min="0" step="500">
-                        </div>
-                    </div>
-                    <div class="input-group optional-input">
-                        <label for="oasStartAge">OAS Start Age <span class="label-hint">65 = standard &nbsp;|&nbsp; 70 = +36%</span></label>
-                        <div class="input-wrapper">
-                            <input type="number" id="oasStartAge" value="65" min="65" max="70">
-                            <span class="unit">Yrs</span>
-                        </div>
-                        <div id="oasAdjNote" class="benefit-adj-note"></div>
-                    </div>
-                    <div class="input-group optional-input">
-                        <label for="oasAmountAt65">Est. OAS at Age 65 <span class="label-hint">post-tax · max 2025: ~$8,700/yr</span></label>
-                        <div class="input-wrapper">
-                            <span class="currency">$</span>
-                            <input type="number" id="oasAmountAt65" value="8700" min="0" step="100">
-                        </div>
-                    </div>
-                    <!-- Partner's CPP & OAS (shown only when planning as a couple) -->
+                    <!-- Partner's CPP & OAS -->
                     <div id="partnerCppOasInputs" class="partner-block optional-input" style="display: none;">
-                        <div class="partner-block-label">Partner's CPP &amp; OAS</div>
+                        <div class="divider"></div>
+                        <h3>Partner's CPP &amp; OAS</h3>
                         <div class="input-group">
                             <label for="partnerCppStartAge">Partner's CPP Start Age <span class="label-hint">partner's age</span></label>
                             <div class="input-wrapper">
@@ -302,7 +359,7 @@
                             <div id="partnerCppAdjNote" class="benefit-adj-note"></div>
                         </div>
                         <div class="input-group">
-                            <label for="partnerCppAmountAt65">Partner's Est. CPP at 65 <span class="label-hint">post-tax</span></label>
+                            <label for="partnerCppAmountAt65">Partner's Est. CPP at Age 65 <span class="label-hint">post-tax</span></label>
                             <div class="input-wrapper">
                                 <span class="currency">$</span>
                                 <input type="number" id="partnerCppAmountAt65" value="0" min="0" step="500">
@@ -317,48 +374,12 @@
                             <div id="partnerOasAdjNote" class="benefit-adj-note"></div>
                         </div>
                         <div class="input-group">
-                            <label for="partnerOasAmountAt65">Partner's Est. OAS at 65 <span class="label-hint">post-tax</span></label>
+                            <label for="partnerOasAmountAt65">Partner's Est. OAS at Age 65 <span class="label-hint">post-tax</span></label>
                             <div class="input-wrapper">
                                 <span class="currency">$</span>
-                                <input type="number" id="partnerOasAmountAt65" value="0" min="0" step="100">
-                            </div>
-                        </div>
                     </div>
-                </div>
-
-                <div class="divider"></div>
-
-                <!-- Collapsible Assumptions -->
-                <details class="assumptions-details">
-                    <summary class="assumptions-summary">Assumptions</summary>
-                    <div class="assumptions-body">
-                        <div class="input-group-row">
-                            <div class="input-group half">
-                                <label for="roi">Annual Return <span class="label-hint">post-tax, real</span></label>
-                                <div class="input-wrapper">
-                                    <input type="number" id="roi" value="5.0" min="0" max="20" step="0.1">
-                                    <span class="unit">%</span>
-                                </div>
-                            </div>
-                            <div class="input-group half">
-                                <label for="swr">Safe Withdrawal Rate</label>
-                                <div class="input-wrapper">
-                                    <input type="number" id="swr" value="4.0" min="1" max="10" step="0.1">
-                                    <span class="unit">%</span>
-                                </div>
-                            </div>
-                        </div>
-                        <ul class="assumptions-notes">
-                            <li>Primary residence excluded from portfolio; projections in today's dollars (real return handles inflation)</li>
-                            <li>Portfolio target = (Annual Expenses − Passive Income) ÷ SWR% (the 4% Rule, Bengen 1994)</li>
-                            <li>Annual income is post-tax; annual return is post-tax and inflation-adjusted</li>
-                            <li>Couples are modelled as one shared household portfolio; each partner's pension/CPP/OAS is credited at their own age. No mortality, survivor-benefit, or income-splitting tax effects are modelled.</li>
-                            <li><a href="methodology.html" style="color: var(--accent-color); text-decoration: underline;">Read methodology</a> for detailed assumptions and data sources</li>
-                        </ul>
-                    </div>
-                </details>
-
-            </section>
+                </section>
+            </div>
 
             <!-- Right Column: Results & Chart -->
             <section class="results-section">

@@ -67,6 +67,9 @@ const STATCAN_DATA = {
 const inputs = {
     currentAge: document.getElementById('currentAge'),
     plannedRetAge: document.getElementById('plannedRetirementAge'),
+    partnerPlannedRetAge: document.getElementById('partnerPlannedRetAge'),
+    partnerIncome: document.getElementById('partnerIncome'),
+    partnerAge: document.getElementById('partnerAge'),
     currentBalance: document.getElementById('currentBalance'),
     annualIncome: document.getElementById('annualIncome'),
     annualExpenses: document.getElementById('annualExpenses'),
@@ -118,7 +121,7 @@ let lastReportData = null;
 // Event Listeners
 // -------------------------------------------------------------------
 Object.entries(inputs).forEach(([key, input]) => {
-    input.addEventListener('input', calculateRetirement);
+    if (input) input.addEventListener('input', calculateRetirement);
 });
 Object.values(gcInputs).forEach(input => input.addEventListener('input', calculateRetirement));
 
@@ -196,7 +199,8 @@ function updatePartnerVisibility() {
 }
 
 document.getElementById('chkCouple').addEventListener('change', (e) => {
-    document.getElementById('coupleSection').style.display = e.target.checked ? 'block' : 'none';
+    const cSec = document.getElementById('coupleSection');
+    if (cSec) cSec.style.display = e.target.checked ? 'block' : 'none';
     updatePartnerVisibility();
     calculateRetirement();
 });
@@ -379,16 +383,20 @@ function calculateRetirement() {
     }
 
     // -------------------------------------------------------------------
-    // Couples: build the partner's benefits. The partner's start ages are
-    // their OWN ages; we translate them onto the primary person's timeline
-    // (the single axis the engine simulates on) via the age difference. The
-    // CPP/OAS adjustment amounts are computed with the partner's REAL ages.
+    // Couples: build the partner's benefits & employment inputs.
+    // The partner's start ages are their OWN ages; we translate them onto
+    // the primary person's timeline (the single axis the engine simulates on)
+    // via the age difference.
     // -------------------------------------------------------------------
     const includeCouple = document.getElementById('chkCouple')?.checked;
     const partnerAgeVal = includeCouple ? (parseFloat(document.getElementById('partnerAge').value) || age) : age;
+    const partnerIncome = includeCouple ? (parseFloat(document.getElementById('partnerIncome')?.value) || 0) : 0;
+    const partnerRetAgeReal = (includeCouple && includeRetAge) ? (parseFloat(document.getElementById('partnerPlannedRetAge')?.value) || 55) : 100;
+
     const ageDiff = partnerAgeVal - age;   // >0 if partner is older
     // toPrimary(partnerRealAge) → age on the primary person's timeline
     const toPrimary = (partnerRealAge) => partnerRealAge - ageDiff;
+    const partnerPlannedRetAge = toPrimary(partnerRetAgeReal);
 
     let partner = null;
     if (includeCouple) {
@@ -426,8 +434,9 @@ function calculateRetirement() {
     // The "no DB pension" comparison strips BOTH partners' DB pensions.
     if (partner) benefitsNoPension.partner = { ...partner, pensionAge: 999, lifetimePension: 0, bridgeBenefit: 0 };
 
-    const savings      = income - expenses;
-    const savingsRate  = income > 0 ? (savings / income) * 100 : 0;
+    const totalIncome  = income + partnerIncome;
+    const savings      = totalIncome - expenses;
+    const savingsRate  = totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
     const rMonthly     = roiAnnual / 100 / 12;
     const swrDecimal   = swr / 100;
 
@@ -459,8 +468,8 @@ function calculateRetirement() {
     // credited whenever active; surplus reinvests into the portfolio.
     // -------------------------------------------------------------------
     const engineParams = {
-        age, plannedRetAge, includeRetAge, balance, income, expenses,
-        roiAnnual, swr, rMonthly, swrDecimal,
+        age, plannedRetAge, partnerPlannedRetAge, partnerIncome, includeRetAge, balance,
+        income, expenses, roiAnnual, swr, rMonthly, swrDecimal,
         benefits, includePension, benefitsNoPension
     };
     const result = FinCalc.analyze(engineParams);
@@ -755,6 +764,16 @@ function calculateRetirement() {
     // Partner milestones (couples) — positioned on the primary timeline
     // (translated age), titled with the partner's own age.
     if (partner) {
+        if (includeCouple && includeRetAge && partnerRetAgeReal < 100 && partnerPlannedRetAge > age) {
+            events.push({ age: partnerPlannedRetAge, html: `
+        <li class="timeline-item timeline-emp-ret">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>Partner's Employment Retirement (partner age ${formatNumber(partnerRetAgeReal)})</h4>
+                <p>Partner stops working. ${describeIncomeAt(partnerPlannedRetAge, expenses, benefits, isGCMode)}</p>
+            </div>
+        </li>` });
+        }
         if (partner.pensionAge != null && partner.pensionAge > age) {
             events.push({ age: partner.pensionAge, html: `
         <li class="timeline-item">
@@ -806,7 +825,7 @@ function calculateRetirement() {
 
     if (typeof updateDemographicBenchmarks === 'function') updateDemographicBenchmarks();
 
-    renderReport({ age, income, expenses, savings, savingsRate, balance, rentalIncome,
+    renderReport({ age, income, partnerIncome, includeCouple, partnerPlannedRetAge, partnerRetAgeReal, expenses, savings, savingsRate, balance, rentalIncome,
         roiAnnual, swr, swrDecimal, includeRetAge, plannedRetAge,
         includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
         includeCppOas, cppAmount, cppAge, oasAmount, oasAge,
@@ -1121,17 +1140,24 @@ function wireReportSelectors() {
 }
 
 function rptSnapshot(d) {
-    const { age, income, expenses, savings, savingsRate, balance,
+    const { age, income, partnerIncome, includeCouple, expenses, savings, savingsRate, balance,
             includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
             includeCppOas, cppAmount, cppAge, oasAmount, oasAge, rentalIncome, benefits } = d;
 
+    const totalIncome = income + (includeCouple ? (partnerIncome || 0) : 0);
+
     // A plain-language story of the numbers rather than a label/value dump.
-    const earnSpend = income > 0
-        ? `You earn <strong>${formatCurrency(income)} a year</strong> after tax and spend about <strong>${formatCurrency(expenses)}</strong>, `
-        : `You have not entered any employment income, and you spend about <strong>${formatCurrency(expenses)} a year</strong>. `;
+    let earnSpend = '';
+    if (includeCouple && partnerIncome > 0 && income > 0) {
+        earnSpend = `Together, you earn <strong>${formatCurrency(totalIncome)} a year</strong> after tax (you earn <strong>${formatCurrency(income)}</strong>, your partner earns <strong>${formatCurrency(partnerIncome)}</strong>) and your household spends about <strong>${formatCurrency(expenses)}</strong>, `;
+    } else if (totalIncome > 0) {
+        earnSpend = `You earn <strong>${formatCurrency(totalIncome)} a year</strong> after tax and spend about <strong>${formatCurrency(expenses)}</strong>, `;
+    } else {
+        earnSpend = `You have not entered any employment income, and you spend about <strong>${formatCurrency(expenses)} a year</strong>. `;
+    }
 
     let saveStory = '';
-    if (income > 0) {
+    if (totalIncome > 0) {
         if (savings > 0) {
             saveStory = `which means you put away <strong>${formatCurrency(savings)} a year</strong> — roughly <strong>${formatNumber(savingsRate)} cents of every dollar</strong> you take home. That savings rate is the single biggest lever on when you become financially independent: the more of each paycheque you keep and invest, the sooner those investments can support you instead of your job.`;
         } else if (savings === 0) {

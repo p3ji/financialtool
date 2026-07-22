@@ -621,6 +621,20 @@ for (const roi of [0, 2, 8]) {
     const incNow = C.getRetirementIncome(40, op.benefits);
     check('[couples] already-collecting older partner counted from today',
         Math.abs(incNow - 50000) < 1, `incomeNow=${incNow}`);
+
+    // Staggered couple retirement test (primary retires at 38, partner works to 55)
+    const stag = buildParams({
+        age: 38, income: 50000, expenses: 100000, balance: 200000,
+        includeRetAge: true, plannedRetAge: 38
+    });
+    stag.partnerIncome = 50000;
+    stag.partnerPlannedRetAge = 55;
+    const stagResult = C.analyze(stag);
+    check('[couples staggered] no NaN/Infinity in staggered retirement',
+        stagResult.yearlyData.every(r => finite(r.networth) && finite(r.income)));
+    check('[couples staggered] partner income flows while partner is working',
+        Math.abs(stagResult.yearlyData[1].income - 50000) < 1,
+        `got year1 income=${stagResult.yearlyData[1]?.income}`);
 })();
 
 // ------------------------------------------------------------

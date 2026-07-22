@@ -168,13 +168,19 @@
             age, plannedRetAge, balance, income, expenses,
             rMonthly, swrDecimal, benefits,
             stopEmploymentAtRet = true,
-            fiMonthForMarking = undefined
+            fiMonthForMarking = undefined,
+            partnerIncome = 0,
+            partnerPlannedRetAge = 100
         } = params;
 
         const maxMonths = (100 - age) * 12;
         const monthsToEmpStop = stopEmploymentAtRet
             ? Math.max(0, Math.round((plannedRetAge - age) * 12))
             : maxMonths + 1; // never stops within the horizon
+        const monthsToPartnerEmpStop = stopEmploymentAtRet
+            ? Math.max(0, Math.round((partnerPlannedRetAge - age) * 12))
+            : maxMonths + 1;
+        const monthsToAllEmpStop = Math.max(monthsToEmpStop, monthsToPartnerEmpStop);
 
         let bal = balance;
         let fiMonth = null;
@@ -203,11 +209,13 @@
 
         for (let m = 0; m <= maxMonths; m++) {
             const currentAge = age + m / 12;
-            const isWorking  = m < monthsToEmpStop;
+            const isPrimaryWorking = m < monthsToEmpStop;
+            const isPartnerWorking = m < monthsToPartnerEmpStop;
 
             // Key chart points: yearly + income transitions (self + partner)
             if (m % 12 === 0 ||
                 m === monthsToEmpStop ||
+                m === monthsToPartnerEmpStop ||
                 transitionAges.some(a => Math.abs(currentAge - a) < 0.05) ||
                 Math.abs(currentAge - 65) < 0.05) {
                 simData.push({ x: currentAge, y: bal });
@@ -215,13 +223,13 @@
 
             // FI check — portfolio can sustain withdrawals from here. A
             // crossing only counts while employment is still running
-            // (m <= monthsToEmpStop): FI age means "earliest you could
+            // (m <= monthsToAllEmpStop): FI age means "earliest you could
             // afford to STOP working". A portfolio that merely coasts
             // across the SWR threshold years after work already ended
             // (high ROI outpacing the drawdown) is a phantom late-life
             // "FI at 95" (invariant #6), not an achievable stop-work age.
             const required = getRequiredBalanceAtAge(currentAge, expenses, swrDecimal, rMonthly, benefits);
-            if (fiMonth === null && m <= monthsToEmpStop && bal >= required) {
+            if (fiMonth === null && m <= monthsToAllEmpStop && bal >= required) {
                 fiMonth = m;
                 simData.push({ x: currentAge, y: bal });
             }
@@ -235,13 +243,13 @@
             }
 
             // Transition markers for the table
-            if (m === monthsToEmpStop) isEmpRetYear = true;
+            if (m === monthsToEmpStop || m === monthsToPartnerEmpStop) isEmpRetYear = true;
             if (benefits.pensionAge < 999 && currentAge >= benefits.pensionAge && currentAge - 1/12 < benefits.pensionAge) isPensionYear = true;
             if (benefits.cppAge     < 999 && currentAge >= benefits.cppAge     && currentAge - 1/12 < benefits.cppAge)     isCppYear    = true;
             if (benefits.oasAge     < 999 && currentAge >= benefits.oasAge     && currentAge - 1/12 < benefits.oasAge)     isOasYear    = true;
 
             // Cashflow this month
-            const empIncome      = isWorking ? income : 0;
+            const empIncome      = (isPrimaryWorking ? income : 0) + (isPartnerWorking ? partnerIncome : 0);
             const passiveIncome  = getRetirementIncome(currentAge, benefits);
             const monthlyIncome  = (empIncome + passiveIncome) / 12;
             const monthlyROI     = bal * rMonthly;
@@ -280,13 +288,19 @@
     // ---- Balance at the employment-retirement date -----------------
     // Mirrors the simulation's monthly step (passive income credited).
     function balanceAtAge(targetAge, params) {
-        const { age, balance, income, expenses, rMonthly, benefits } = params;
+        const { age, balance, income, expenses, rMonthly, benefits,
+                partnerIncome = 0, partnerPlannedRetAge = 100 } = params;
         const months = Math.max(0, Math.round((targetAge - age) * 12));
+        const monthsToEmpStop = Math.max(0, Math.round((params.plannedRetAge - age) * 12));
+        const monthsToPartnerEmpStop = Math.max(0, Math.round((partnerPlannedRetAge - age) * 12));
         let b = balance;
         for (let m = 0; m < months; m++) {
             const currentAge = age + m / 12;
+            const isPrimaryWorking = m < monthsToEmpStop;
+            const isPartnerWorking = m < monthsToPartnerEmpStop;
+            const empIncome = (isPrimaryWorking ? income : 0) + (isPartnerWorking ? partnerIncome : 0);
             const passiveIncome = getRetirementIncome(currentAge, benefits);
-            b = b * (1 + rMonthly) + (income + passiveIncome - expenses) / 12;
+            b = b * (1 + rMonthly) + (empIncome + passiveIncome - expenses) / 12;
         }
         return b;
     }
@@ -305,7 +319,8 @@
         const accum = runSimulation({
             ...params,
             stopEmploymentAtRet: true,
-            plannedRetAge: MAX_WORK_AGE
+            plannedRetAge: MAX_WORK_AGE,
+            partnerPlannedRetAge: MAX_WORK_AGE
         });
         const fiMonth = accum.fiMonth;
 

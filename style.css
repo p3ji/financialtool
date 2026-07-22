@@ -144,6 +144,24 @@ header h1 span {
     grid-template-columns: 350px 1fr;
     gap: 2rem;
     align-items: start;
+    transition: grid-template-columns 0.3s ease;
+}
+
+.inputs-column-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+@media (min-width: 1200px) {
+    .dashboard.has-couple-mode {
+        grid-template-columns: minmax(680px, 720px) 1fr;
+    }
+    .dashboard.has-couple-mode .inputs-column-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+    }
 }
 
 @media (max-width: 900px) {
