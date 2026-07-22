@@ -5,9 +5,11 @@
   "description": "Static FI / early-retirement calculator for Canadian public servants with a defined-benefit pension.",
   "scripts": {
     "test": "node tests/run-scenarios.js",
-    "test:dom": "node tests/smoke-dom.js"
+    "test:dom": "node tests/smoke-dom.js",
+    "test:playwright": "node tests/test-playwright.js"
   },
   "devDependencies": {
-    "jsdom": "^24.0.0"
+    "jsdom": "^24.0.0",
+    "playwright": "^1.61.1"
   }
 }

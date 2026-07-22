@@ -144,6 +144,7 @@ toggles.btnGCMode.addEventListener('click', () => {
 
 document.getElementById('chkIncludeRetAge').addEventListener('change', (e) => {
     document.getElementById('retAgeSection').style.display = e.target.checked ? 'block' : 'none';
+    updatePartnerVisibility();
     calculateRetirement();
 });
 
@@ -192,8 +193,21 @@ function updatePartnerVisibility() {
     const couple    = document.getElementById('chkCouple')?.checked;
     const pensionOn = document.getElementById('chkIncludePension')?.checked;
     const cppOasOn  = document.getElementById('chkIncludeCppOas')?.checked;
+    const retAgeOn  = document.getElementById('chkIncludeRetAge')?.checked;
+
+    const sPanel = document.getElementById('spouseProfilePanel');
+    const dash   = document.querySelector('.dashboard');
+    if (sPanel) sPanel.style.display = couple ? 'block' : 'none';
+    if (dash) {
+        if (couple) dash.classList.add('has-couple-mode');
+        else dash.classList.remove('has-couple-mode');
+    }
+
+    const rBlock = document.getElementById('partnerRetAgeSection');
     const pBlock = document.getElementById('partnerPensionInputs');
     const cBlock = document.getElementById('partnerCppOasInputs');
+
+    if (rBlock) rBlock.style.display = (couple && retAgeOn)  ? 'block' : 'none';
     if (pBlock) pBlock.style.display = (couple && pensionOn) ? 'block' : 'none';
     if (cBlock) cBlock.style.display = (couple && cppOasOn)  ? 'block' : 'none';
 }
@@ -402,6 +416,12 @@ function calculateRetirement() {
     if (includeCouple) {
         const p = {};
         let hasSource = false;
+        if (partnerIncome > 0) {
+            p.partnerIncome = partnerIncome;
+            p.partnerPlannedRetAge = partnerPlannedRetAge;
+            p._partnerRetAgeReal = partnerRetAgeReal;
+            hasSource = true;
+        }
         if (includePension) {
             const pPenAmt     = parseFloat(document.getElementById('partnerPensionAmount').value) || 0;
             const pPenAgeReal = parseFloat(document.getElementById('partnerPensionAge').value) || 999;
@@ -425,7 +445,7 @@ function calculateRetirement() {
             if (pCppAmt > 0) { p.cppAge = toPrimary(pCppAgeReal); p.cppAmount = pCppAmt; p._cppAgeReal = pCppAgeReal; hasSource = true; }
             if (pOasAmt > 0) { p.oasAge = toPrimary(pOasAgeReal); p.oasAmount = pOasAmt; p._oasAgeReal = pOasAgeReal; hasSource = true; }
         }
-        if (hasSource) partner = p;
+        if (hasSource || partnerRetAgeReal < 100) partner = p;
     }
 
     const benefits = { pensionAge, lifetimePension, bridgeBenefit, cppAge, cppAmount, oasAge, oasAmount, rentalIncome };
