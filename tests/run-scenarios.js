@@ -570,6 +570,60 @@ for (const roi of [0, 2, 8]) {
 })();
 
 // ------------------------------------------------------------
+// 17. Couples: a partner's guaranteed income (pension/CPP/OAS) is credited
+//     on the shared household timeline. Partner start ages are pre-translated
+//     onto the primary person's axis (as app.js does), so the engine sees one
+//     timeline. A partner pension must lower the FI portfolio target and add
+//     to the income stream; single-person results stay unchanged (byte-for-byte
+//     — verified implicitly by every section above still passing).
+// ------------------------------------------------------------
+(function couples() {
+    const solo = C.analyze(buildParams({
+        age: 40, income: 130000, expenses: 90000, balance: 300000,
+        pensionAge: 60, lifetimePension: 30000 }));
+
+    // Same person, now with a partner (same age → no translation) who also has
+    // a $30k pension at their 60.
+    const cp = buildParams({
+        age: 40, income: 130000, expenses: 90000, balance: 300000,
+        pensionAge: 60, lifetimePension: 30000 });
+    cp.benefits.partner = { pensionAge: 60, lifetimePension: 30000 };
+    cp.benefitsNoPension.partner = { pensionAge: 999, lifetimePension: 0 };
+    const couple = C.analyze(cp);
+
+    check('[couples] both achievable', solo.fiAge !== null && couple.fiAge !== null,
+        `solo=${solo.fiAge} couple=${couple.fiAge}`);
+    check('[couples] partner pension lowers the FI portfolio target',
+        couple.fiPortfolio < solo.fiPortfolio,
+        `solo=${solo.fiPortfolio?.toFixed(0)} couple=${couple.fiPortfolio?.toFixed(0)}`);
+    check('[couples] partner income reaches FI no later than solo',
+        couple.fiAge <= solo.fiAge + 1e-9, `solo=${solo.fiAge} couple=${couple.fiAge}`);
+
+    const inc62 = C.getRetirementIncome(62, cp.benefits);
+    check('[couples] both pensions credited to household income at 62',
+        Math.abs(inc62 - 60000) < 1, `income@62=${inc62}`);
+
+    let clean = (couple.fiPortfolio === null || finite(couple.fiPortfolio));
+    for (const p of couple.simData) if (!finite(p.x) || !finite(p.y)) clean = false;
+    check('[couples] no NaN/Infinity with a partner', clean);
+
+    const w = C.describeIncomeAt(62, 90000, cp.benefits, false);
+    check('[couples] income wording distinguishes partner sources',
+        /Your DB Pension/.test(w) && /Partner's DB Pension/.test(w) && !/NaN|undefined/.test(w), w);
+
+    // Older partner already collecting: partner is 67 (27 yrs older than the
+    // 40-yr-old primary) and their pension started at their 60. Translated onto
+    // the primary axis (realStart − ageDiff = 60 − 27 = 33) it is already
+    // flowing today, so household income at primary-age-40 must include it.
+    const op = buildParams({ age: 40, income: 0, expenses: 80000, balance: 500000,
+        pensionAge: 65, lifetimePension: 20000 });
+    op.benefits.partner = { pensionAge: 60 - 27, lifetimePension: 50000 };
+    const incNow = C.getRetirementIncome(40, op.benefits);
+    check('[couples] already-collecting older partner counted from today',
+        Math.abs(incNow - 50000) < 1, `incomeNow=${incNow}`);
+})();
+
+// ------------------------------------------------------------
 console.log(`\n${'='.repeat(60)}`);
 console.log(`Scenario tests: ${pass} passed, ${fail} failed`);
 if (failures.length) {

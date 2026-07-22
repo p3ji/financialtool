@@ -912,6 +912,27 @@ header h1 span {
     margin-left: 1.5rem;
 }
 
+/* Couples — household note + partner sub-blocks */
+.couple-note {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin: 0.25rem 0 0.75rem 0;
+}
+.partner-block {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed var(--panel-border);
+}
+.partner-block-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent-color);
+    margin-bottom: 0.5rem;
+}
+
 /* Section title row + inline help icon */
 .section-title-row {
     display: flex;

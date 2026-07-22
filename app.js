@@ -172,11 +172,39 @@ document.getElementById('btnPortfolioDetailed').addEventListener('click', () => 
 
 cppOasInputs.chkIncludeCppOas.addEventListener('change', (e) => {
     cppOasInputs.cppOasSection.style.display = e.target.checked ? 'block' : 'none';
+    updatePartnerVisibility();
     calculateRetirement();
 });
 [cppOasInputs.cppStartAge, cppOasInputs.cppAmountAt65,
  cppOasInputs.oasStartAge, cppOasInputs.oasAmountAt65].forEach(input => {
     if (input) input.addEventListener('input', calculateRetirement);
+});
+
+// -------------------------------------------------------------------
+// Couples: partner sub-sections live inside the DB Pension and CPP/OAS
+// blocks and are only visible when "Planning as a couple" is on AND the
+// parent section is enabled.
+// -------------------------------------------------------------------
+function updatePartnerVisibility() {
+    const couple    = document.getElementById('chkCouple')?.checked;
+    const pensionOn = document.getElementById('chkIncludePension')?.checked;
+    const cppOasOn  = document.getElementById('chkIncludeCppOas')?.checked;
+    const pBlock = document.getElementById('partnerPensionInputs');
+    const cBlock = document.getElementById('partnerCppOasInputs');
+    if (pBlock) pBlock.style.display = (couple && pensionOn) ? 'block' : 'none';
+    if (cBlock) cBlock.style.display = (couple && cppOasOn)  ? 'block' : 'none';
+}
+
+document.getElementById('chkCouple').addEventListener('change', (e) => {
+    document.getElementById('coupleSection').style.display = e.target.checked ? 'block' : 'none';
+    updatePartnerVisibility();
+    calculateRetirement();
+});
+['partnerAge', 'partnerPensionAge', 'partnerPensionAmount',
+ 'partnerCppStartAge', 'partnerCppAmountAt65',
+ 'partnerOasStartAge', 'partnerOasAmountAt65'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', calculateRetirement);
 });
 
 const demoSelectors = [
@@ -187,6 +215,7 @@ demoSelectors.forEach(sel => { if (sel) sel.addEventListener('change', () => cal
 
 document.getElementById('chkIncludePension').addEventListener('change', (e) => {
     document.getElementById('pensionDetailsSection').style.display = e.target.checked ? 'block' : 'none';
+    updatePartnerVisibility();
     calculateRetirement();
 });
 
@@ -231,7 +260,9 @@ function saveFormState() {
                      'gcPensionAge', 'gcLifetimePension', 'gcBridgeBenefit',
                      'cppStartAge', 'cppAmountAt65', 'oasStartAge', 'oasAmountAt65',
                      'rrspBalance', 'tfasaBalance', 'nonRegBalance', 'incomePropertyValue', 'rentalIncome',
-                     'chkIncludeRetAge', 'chkIncludePortfolio', 'chkIncludePension', 'chkIncludeCppOas',
+                     'partnerAge', 'partnerPensionAge', 'partnerPensionAmount',
+                     'partnerCppStartAge', 'partnerCppAmountAt65', 'partnerOasStartAge', 'partnerOasAmountAt65',
+                     'chkIncludeRetAge', 'chkIncludePortfolio', 'chkIncludePension', 'chkIncludeCppOas', 'chkCouple',
                      'btnSimpleMode', 'btnGCMode', 'btnPortfolioSimple', 'btnPortfolioDetailed'];
 
     elements.forEach(id => {
@@ -347,8 +378,53 @@ function calculateRetirement() {
         updateAdjustmentNote('oasAdjNote', oasBase, oasAmount, oasStartAgeVal);
     }
 
+    // -------------------------------------------------------------------
+    // Couples: build the partner's benefits. The partner's start ages are
+    // their OWN ages; we translate them onto the primary person's timeline
+    // (the single axis the engine simulates on) via the age difference. The
+    // CPP/OAS adjustment amounts are computed with the partner's REAL ages.
+    // -------------------------------------------------------------------
+    const includeCouple = document.getElementById('chkCouple')?.checked;
+    const partnerAgeVal = includeCouple ? (parseFloat(document.getElementById('partnerAge').value) || age) : age;
+    const ageDiff = partnerAgeVal - age;   // >0 if partner is older
+    // toPrimary(partnerRealAge) → age on the primary person's timeline
+    const toPrimary = (partnerRealAge) => partnerRealAge - ageDiff;
+
+    let partner = null;
+    if (includeCouple) {
+        const p = {};
+        let hasSource = false;
+        if (includePension) {
+            const pPenAmt     = parseFloat(document.getElementById('partnerPensionAmount').value) || 0;
+            const pPenAgeReal = parseFloat(document.getElementById('partnerPensionAge').value) || 999;
+            if (pPenAmt > 0 && pPenAgeReal < 999) {
+                p.pensionAge      = toPrimary(pPenAgeReal);
+                p.lifetimePension = pPenAmt;
+                p.bridgeBenefit   = 0;
+                p._pensionAgeReal = pPenAgeReal;
+                hasSource = true;
+            }
+        }
+        if (includeCppOas) {
+            const pCppAgeReal = parseFloat(document.getElementById('partnerCppStartAge').value) || 65;
+            const pCppBase    = parseFloat(document.getElementById('partnerCppAmountAt65').value) || 0;
+            const pOasAgeReal = parseFloat(document.getElementById('partnerOasStartAge').value) || 65;
+            const pOasBase    = parseFloat(document.getElementById('partnerOasAmountAt65').value) || 0;
+            const pCppAmt = pCppBase > 0 ? calcCppAdjusted(pCppBase, pCppAgeReal) : 0;
+            const pOasAmt = pOasBase > 0 ? calcOasAdjusted(pOasBase, pOasAgeReal) : 0;
+            updateAdjustmentNote('partnerCppAdjNote', pCppBase, pCppAmt, pCppAgeReal);
+            updateAdjustmentNote('partnerOasAdjNote', pOasBase, pOasAmt, pOasAgeReal);
+            if (pCppAmt > 0) { p.cppAge = toPrimary(pCppAgeReal); p.cppAmount = pCppAmt; p._cppAgeReal = pCppAgeReal; hasSource = true; }
+            if (pOasAmt > 0) { p.oasAge = toPrimary(pOasAgeReal); p.oasAmount = pOasAmt; p._oasAgeReal = pOasAgeReal; hasSource = true; }
+        }
+        if (hasSource) partner = p;
+    }
+
     const benefits = { pensionAge, lifetimePension, bridgeBenefit, cppAge, cppAmount, oasAge, oasAmount, rentalIncome };
+    if (partner) benefits.partner = partner;
     const benefitsNoPension = { ...benefits, pensionAge: 999, lifetimePension: 0, bridgeBenefit: 0 };
+    // The "no DB pension" comparison strips BOTH partners' DB pensions.
+    if (partner) benefitsNoPension.partner = { ...partner, pensionAge: 999, lifetimePension: 0, bridgeBenefit: 0 };
 
     const savings      = income - expenses;
     const savingsRate  = income > 0 ? (savings / income) * 100 : 0;
@@ -674,6 +750,45 @@ function calculateRetirement() {
                 <p>${describeIncomeAt(oasAge, expenses, benefits, isGCMode)}</p>
             </div>
         </li>` });
+    }
+
+    // Partner milestones (couples) — positioned on the primary timeline
+    // (translated age), titled with the partner's own age.
+    if (partner) {
+        if (partner.pensionAge != null && partner.pensionAge > age) {
+            events.push({ age: partner.pensionAge, html: `
+        <li class="timeline-item">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>Partner's DB Pension Starts (partner age ${formatNumber(partner._pensionAgeReal)})</h4>
+                <p>${describeIncomeAt(partner.pensionAge, expenses, benefits, isGCMode)}</p>
+            </div>
+        </li>` });
+        }
+        const partnerCppOasSame = partner.cppAge != null && partner.oasAge != null && Math.abs(partner.cppAge - partner.oasAge) < 1e-6;
+        if (partner.cppAge != null && partner.cppAge > age) {
+            const title = partnerCppOasSame
+                ? `Partner's CPP &amp; OAS Start (partner age ${formatNumber(partner._cppAgeReal)})`
+                : `Partner's CPP Starts (partner age ${formatNumber(partner._cppAgeReal)})`;
+            events.push({ age: partner.cppAge, html: `
+        <li class="timeline-item timeline-cpp">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>${title}</h4>
+                <p>${describeIncomeAt(partner.cppAge, expenses, benefits, isGCMode)}</p>
+            </div>
+        </li>` });
+        }
+        if (partner.oasAge != null && partner.oasAge > age && !partnerCppOasSame) {
+            events.push({ age: partner.oasAge, html: `
+        <li class="timeline-item timeline-oas">
+            <div class="timeline-marker"></div>
+            <div class="timeline-content">
+                <h4>Partner's OAS Starts (partner age ${formatNumber(partner._oasAgeReal)})</h4>
+                <p>${describeIncomeAt(partner.oasAge, expenses, benefits, isGCMode)}</p>
+            </div>
+        </li>` });
+        }
     }
 
     // Once the portfolio is exhausted, later milestones (pension/CPP/OAS) are
@@ -1008,7 +1123,7 @@ function wireReportSelectors() {
 function rptSnapshot(d) {
     const { age, income, expenses, savings, savingsRate, balance,
             includePension, isGCMode, pensionAge, lifetimePension, bridgeBenefit,
-            includeCppOas, cppAmount, cppAge, oasAmount, oasAge, rentalIncome } = d;
+            includeCppOas, cppAmount, cppAge, oasAmount, oasAge, rentalIncome, benefits } = d;
 
     // A plain-language story of the numbers rather than a label/value dump.
     const earnSpend = income > 0
@@ -1041,6 +1156,17 @@ function rptSnapshot(d) {
     if (includeCppOas && cppAmount > 0) sourceLines.push(`<li><strong>${formatCurrency(cppAmount)}/yr from CPP</strong>, starting at age ${cppAge}. The Canada Pension Plan pays you back, as a monthly cheque for life, for the contributions taken off your paycheques during your working years.</li>`);
     if (includeCppOas && oasAmount > 0) sourceLines.push(`<li><strong>${formatCurrency(oasAmount)}/yr from OAS</strong>, starting at age ${oasAge}. Old Age Security is a pension most Canadians receive from the government starting around 65, paid out of general taxes rather than your own contributions.</li>`);
     if (rentalIncome > 0) sourceLines.push(`<li><strong>${formatCurrency(rentalIncome)}/yr in rental income</strong> from property you own — income that arrives whether or not you are working.</li>`);
+
+    // Partner's guaranteed income (couples). Ages are the partner's own.
+    const partner = benefits && benefits.partner;
+    if (partner) {
+        if (partner.pensionAge != null)
+            sourceLines.push(`<li><strong>${formatCurrency(partner.lifetimePension)}/yr from your partner's defined-benefit pension</strong>, beginning at their age ${formatNumber(partner._pensionAgeReal)}. A second guaranteed lifetime paycheque for the household.</li>`);
+        if (partner.cppAmount > 0)
+            sourceLines.push(`<li><strong>${formatCurrency(partner.cppAmount)}/yr from your partner's CPP</strong>, starting at their age ${formatNumber(partner._cppAgeReal)}.</li>`);
+        if (partner.oasAmount > 0)
+            sourceLines.push(`<li><strong>${formatCurrency(partner.oasAmount)}/yr from your partner's OAS</strong>, starting at their age ${formatNumber(partner._oasAgeReal)}.</li>`);
+    }
 
     const sourcesBlock = sourceLines.length
         ? `<p class="report-narrative">On top of your own savings, you can count on these guaranteed income streams later in life:</p>
@@ -1119,27 +1245,53 @@ function rptAnswer(d) {
 function rptIncome(d) {
     const { fiAge, expenses, includePension, isGCMode, pensionAge, lifetimePension,
             bridgeBenefit, includeCppOas, cppAmount, cppAge, oasAmount, oasAge,
-            rentalIncome, swr, swrDecimal, fiPortfolio } = d;
+            rentalIncome, swr, swrDecimal, fiPortfolio, benefits } = d;
 
     const rows = [];
+    // "Your " prefixes sources only when a partner is present; solo stays plain.
+    const partner = benefits && benefits.partner;
+    const mine = partner ? 'Your ' : '';
     if (includePension && pensionAge < 999) {
         if (fiAge >= pensionAge) {
-            rows.push({ label: isGCMode ? 'Lifetime Pension' : 'DB Pension', when: `Starts age ${formatNumber(pensionAge)}`, amount: lifetimePension });
+            rows.push({ label: mine + (isGCMode ? 'Lifetime Pension' : 'DB Pension'), when: `Starts age ${formatNumber(pensionAge)}`, amount: lifetimePension });
             if (isGCMode && bridgeBenefit > 0 && fiAge < 65)
-                rows.push({ label: 'Bridge Benefit', when: 'Ends at 65', amount: bridgeBenefit });
+                rows.push({ label: mine + 'Bridge Benefit', when: 'Ends at 65', amount: bridgeBenefit });
         } else {
-            rows.push({ label: isGCMode ? 'Lifetime Pension' : 'DB Pension', when: `Age ${formatNumber(pensionAge)} — after FI`, amount: 0, pending: true });
+            rows.push({ label: mine + (isGCMode ? 'Lifetime Pension' : 'DB Pension'), when: `Age ${formatNumber(pensionAge)} — after FI`, amount: 0, pending: true });
         }
     }
     if (includeCppOas && cppAmount > 0) {
-        if (fiAge >= cppAge) rows.push({ label: 'CPP', when: `Age ${cppAge}`, amount: cppAmount });
-        else                 rows.push({ label: 'CPP', when: `Age ${cppAge} — after FI`, amount: 0, pending: true });
+        if (fiAge >= cppAge) rows.push({ label: mine + 'CPP', when: `Age ${cppAge}`, amount: cppAmount });
+        else                 rows.push({ label: mine + 'CPP', when: `Age ${cppAge} — after FI`, amount: 0, pending: true });
     }
     if (includeCppOas && oasAmount > 0) {
-        if (fiAge >= oasAge) rows.push({ label: 'OAS', when: `Age ${oasAge}`, amount: oasAmount });
-        else                 rows.push({ label: 'OAS', when: `Age ${oasAge} — after FI`, amount: 0, pending: true });
+        if (fiAge >= oasAge) rows.push({ label: mine + 'OAS', when: `Age ${oasAge}`, amount: oasAmount });
+        else                 rows.push({ label: mine + 'OAS', when: `Age ${oasAge} — after FI`, amount: 0, pending: true });
     }
     if (rentalIncome > 0) rows.push({ label: 'Rental Income', when: 'Ongoing', amount: rentalIncome });
+
+    // Partner's guaranteed income (couples). Ages shown are the partner's own;
+    // active/pending is judged on the shared timeline (translated age vs FI).
+    if (partner) {
+        if (partner.pensionAge != null) {
+            const active = fiAge >= partner.pensionAge;
+            rows.push({ label: "Partner's DB Pension",
+                when: active ? `Partner age ${formatNumber(partner._pensionAgeReal)}` : `Partner age ${formatNumber(partner._pensionAgeReal)} — after FI`,
+                amount: active ? partner.lifetimePension : 0, pending: !active });
+        }
+        if (partner.cppAmount > 0) {
+            const active = fiAge >= partner.cppAge;
+            rows.push({ label: "Partner's CPP",
+                when: active ? `Partner age ${formatNumber(partner._cppAgeReal)}` : `Partner age ${formatNumber(partner._cppAgeReal)} — after FI`,
+                amount: active ? partner.cppAmount : 0, pending: !active });
+        }
+        if (partner.oasAmount > 0) {
+            const active = fiAge >= partner.oasAge;
+            rows.push({ label: "Partner's OAS",
+                when: active ? `Partner age ${formatNumber(partner._oasAgeReal)}` : `Partner age ${formatNumber(partner._oasAgeReal)} — after FI`,
+                amount: active ? partner.oasAmount : 0, pending: !active });
+        }
+    }
 
     const totalPassive = rows.filter(r => !r.pending).reduce((s, r) => s + r.amount, 0);
     const draw = Math.max(0, expenses - totalPassive);
@@ -1253,6 +1405,28 @@ function rptTimeline(d) {
     if (includeCppOas && oasAmount > 0 && oasAge > age && !(cppAmount > 0 && oasAge === cppAge)) {
         events.push({ age: oasAge, isFI: false, title: 'OAS Starts',
             body: describeIncomeAt(oasAge, expenses, benefits, isGCMode) });
+    }
+
+    // Partner milestones (couples) — positioned on the shared timeline.
+    const partner = benefits && benefits.partner;
+    if (partner) {
+        if (partner.pensionAge != null && partner.pensionAge > age) {
+            events.push({ age: partner.pensionAge, isFI: false,
+                title: `Partner's DB Pension Starts (partner age ${formatNumber(partner._pensionAgeReal)})`,
+                body: describeIncomeAt(partner.pensionAge, expenses, benefits, isGCMode) });
+        }
+        const same = partner.cppAge != null && partner.oasAge != null && Math.abs(partner.cppAge - partner.oasAge) < 1e-6;
+        if (partner.cppAge != null && partner.cppAge > age) {
+            events.push({ age: partner.cppAge, isFI: false,
+                title: same ? `Partner's CPP & OAS Start (partner age ${formatNumber(partner._cppAgeReal)})`
+                            : `Partner's CPP Starts (partner age ${formatNumber(partner._cppAgeReal)})`,
+                body: describeIncomeAt(partner.cppAge, expenses, benefits, isGCMode) });
+        }
+        if (partner.oasAge != null && partner.oasAge > age && !same) {
+            events.push({ age: partner.oasAge, isFI: false,
+                title: `Partner's OAS Starts (partner age ${formatNumber(partner._oasAgeReal)})`,
+                body: describeIncomeAt(partner.oasAge, expenses, benefits, isGCMode) });
+        }
     }
 
     // Nothing past the day the money runs out belongs in the story.

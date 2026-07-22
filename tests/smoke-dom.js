@@ -141,6 +141,39 @@ for (const sc of scenarios) {
     else { console.log(`✗ portfolio-only report wording (badGuaranteed=${badGuaranteed}, badGap=${badGap}, goodOwn=${goodOwn})`); ok = false; }
 })();
 
+// Couples: adding a partner's DB pension must lower the FI portfolio target and
+// surface partner income in the timeline + report, with no runtime errors.
+(function couplesUI() {
+    errors.length = 0;
+    // Reset to a clean solo saver with one pension.
+    setChk('chkIncludeRetAge', false);
+    setChk('chkIncludeCppOas', false);
+    setChk('chkCouple', false);
+    setVal('currentAge', 40); setVal('annualIncome', 130000); setVal('annualExpenses', 90000);
+    setChk('chkIncludePortfolio', true); setVal('currentBalance', 300000);
+    setChk('chkIncludePension', true); setVal('pensionAge', 60); setVal('pensionAmount', 30000);
+    const soloTarget = parseFloat(read('resFIPortfolio').replace(/[^0-9.]/g, ''));
+
+    // Turn on couple + a partner pension of the same size at the same age.
+    setChk('chkCouple', true);
+    setVal('partnerAge', 40); setVal('partnerPensionAge', 60); setVal('partnerPensionAmount', 30000);
+    const coupleTarget = parseFloat(read('resFIPortfolio').replace(/[^0-9.]/g, ''));
+
+    const timeline = doc.querySelector('.timeline').textContent;
+    const report   = doc.getElementById('reportPanel').textContent;
+    const partnerVisible = doc.getElementById('partnerPensionInputs').style.display !== 'none';
+    const lowerTarget    = coupleTarget < soloTarget;
+    const timelinePartner = /Partner's DB Pension/.test(timeline);
+    const reportPartner   = /partner's defined-benefit|Partner's DB Pension/.test(report);
+    const noNaN           = !/NaN|undefined/.test(timeline + report);
+
+    if (!errors.length && partnerVisible && lowerTarget && timelinePartner && reportPartner && noNaN)
+        console.log(`✓ couples: partner pension lowers target (${soloTarget}→${coupleTarget}), timeline + report show partner income`);
+    else { console.log(`✗ couples UI (errs=${errors.length}, partnerVisible=${partnerVisible}, lowerTarget=${lowerTarget} ${soloTarget}->${coupleTarget}, timelinePartner=${timelinePartner}, reportPartner=${reportPartner}, noNaN=${noNaN})`); ok = false; }
+    // Leave couple mode off so later checks run in the solo baseline.
+    setChk('chkCouple', false);
+})();
+
 const reportHtml = doc.getElementById('reportPanel').innerHTML;
 if (/No passive income active/.test(reportHtml)) { console.log('✗ report still says "No passive income active"'); ok = false; }
 else console.log('✓ report free of stale "No passive income active" wording');
