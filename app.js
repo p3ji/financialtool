@@ -258,7 +258,9 @@ if (btnToggleTable && detailedTableContainer) {
         const isHidden = detailedTableContainer.style.display === 'none';
         detailedTableContainer.style.display = isHidden ? 'block' : 'none';
         btnToggleTable.textContent = isHidden ? 'Hide Detailed Table' : 'Show Detailed Table';
-        if (isHidden) detailedTableContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (isHidden && typeof detailedTableContainer.scrollIntoView === 'function') {
+            detailedTableContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
     });
 }
 

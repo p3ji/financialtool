@@ -170,6 +170,28 @@ for (const sc of scenarios) {
     if (!errors.length && partnerVisible && lowerTarget && timelinePartner && reportPartner && noNaN)
         console.log(`✓ couples: partner pension lowers target (${soloTarget}→${coupleTarget}), timeline + report show partner income`);
     else { console.log(`✗ couples UI (errs=${errors.length}, partnerVisible=${partnerVisible}, lowerTarget=${lowerTarget} ${soloTarget}->${coupleTarget}, timelinePartner=${timelinePartner}, reportPartner=${reportPartner}, noNaN=${noNaN})`); ok = false; }
+
+    // Test Staggered Retirement Detailed Table Tags ([You Retire], [Partner Retires])
+    setChk('chkIncludeRetAge', true);
+    setVal('currentAge', 38); setVal('annualIncome', 0); setVal('annualExpenses', 100000);
+    setVal('plannedRetirementAge', 38);
+    setVal('partnerAge', 35); setVal('partnerIncome', 100000); setVal('partnerPlannedRetAge', 45);
+
+    // Render detailed table
+    const btnTable = doc.getElementById('btnToggleTable');
+    if (doc.getElementById('detailedTableContainer').style.display === 'none') btnTable.click();
+
+    const tableHtml = doc.getElementById('detailedTable').innerHTML;
+    const hasYouRetire = /You Retire/.test(tableHtml);
+    const hasPartnerRetire = /Partner Retires/.test(tableHtml);
+
+    if (hasYouRetire && hasPartnerRetire) {
+        console.log('✓ couples detailed table: tags "You Retire" and "Partner Retires" rendered correctly');
+    } else {
+        console.log(`✗ couples detailed table tags failed (hasYouRetire=${hasYouRetire}, hasPartnerRetire=${hasPartnerRetire})`);
+        ok = false;
+    }
+
     // Leave couple mode off so later checks run in the solo baseline.
     setChk('chkCouple', false);
 })();

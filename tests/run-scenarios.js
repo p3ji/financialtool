@@ -574,8 +574,7 @@ for (const roi of [0, 2, 8]) {
 //     on the shared household timeline. Partner start ages are pre-translated
 //     onto the primary person's axis (as app.js does), so the engine sees one
 //     timeline. A partner pension must lower the FI portfolio target and add
-//     to the income stream; single-person results stay unchanged (byte-for-byte
-//     — verified implicitly by every section above still passing).
+//     to the income stream; single-person results stay unchanged.
 // ------------------------------------------------------------
 (function couples() {
     const solo = C.analyze(buildParams({
@@ -622,19 +621,78 @@ for (const roi of [0, 2, 8]) {
     check('[couples] already-collecting older partner counted from today',
         Math.abs(incNow - 50000) < 1, `incomeNow=${incNow}`);
 
-    // Staggered couple retirement test (primary retires at 38, partner works to 55)
-    const stag = buildParams({
-        age: 38, income: 50000, expenses: 100000, balance: 200000,
-        includeRetAge: true, plannedRetAge: 38
-    });
-    stag.partnerIncome = 50000;
-    stag.partnerPlannedRetAge = 55;
-    const stagResult = C.analyze(stag);
-    check('[couples staggered] no NaN/Infinity in staggered retirement',
-        stagResult.yearlyData.every(r => finite(r.networth) && finite(r.income)));
-    check('[couples staggered] partner income flows while partner is working',
-        Math.abs(stagResult.yearlyData[1].income - 50000) < 1,
-        `got year1 income=${stagResult.yearlyData[1]?.income}`);
+    // Exhaustive Staggered Retirement Matrix Testing
+    const stagCases = [
+        {
+            name: 'Primary ret 38, Partner ret 45 (Partner 3 yrs younger -> Primary 48)',
+            age: 38, income: 0, partnerAge: 35, partnerIncome: 100000,
+            plannedRetAge: 38, partnerPlannedRetAgeReal: 45,
+            expectedPrimaryRetAge: 38, expectedPartnerRetPrimaryAge: 48,
+            checkWorkingYears: [39, 40, 45, 47], checkRetiredYears: [48, 49, 50]
+        },
+        {
+            name: 'Primary ret 55, Partner ret 40 (Partner 2 yrs older -> Primary 38, already retired at start age 40)',
+            age: 40, income: 80000, partnerAge: 42, partnerIncome: 90000,
+            plannedRetAge: 55, partnerPlannedRetAgeReal: 40,
+            expectedPrimaryRetAge: 55, expectedPartnerRetPrimaryAge: 40,
+            checkWorkingYears: [41, 45, 54], checkRetiredYears: [56, 60]
+        },
+        {
+            name: 'Both retire at same age (Primary 50, Partner 50, same age)',
+            age: 40, income: 70000, partnerAge: 40, partnerIncome: 70000,
+            plannedRetAge: 50, partnerPlannedRetAgeReal: 50,
+            expectedPrimaryRetAge: 50, expectedPartnerRetPrimaryAge: 50,
+            checkWorkingYears: [41, 45, 49], checkRetiredYears: [50, 51, 55]
+        }
+    ];
+
+    for (const sc of stagCases) {
+        const ageDiff = sc.partnerAge - sc.age;
+        const partnerPlannedRetAgePrimary = sc.partnerPlannedRetAgeReal - ageDiff;
+
+        const p = buildParams({
+            age: sc.age, income: sc.income, expenses: 100000, balance: 1000000,
+            includeRetAge: true, plannedRetAge: sc.plannedRetAge
+        });
+        p.partnerIncome = sc.partnerIncome;
+        p.partnerPlannedRetAge = partnerPlannedRetAgePrimary;
+
+        const res = C.analyze(p);
+
+        // 1. Assert no NaN/Infinity
+        check(`[couples matrix/${sc.name}] no NaN/Infinity`,
+            res.yearlyData.every(r => finite(r.networth) && finite(r.income)));
+
+        // 2. Assert isPrimaryRetYear on correct row
+        const primaryRetRow = res.yearlyData.find(r => r.isPrimaryRetYear);
+        check(`[couples matrix/${sc.name}] isPrimaryRetYear on age ${sc.expectedPrimaryRetAge}`,
+            primaryRetRow && primaryRetRow.age === sc.expectedPrimaryRetAge,
+            `got age=${primaryRetRow?.age}, expected=${sc.expectedPrimaryRetAge}`);
+
+        // 3. Assert isPartnerRetYear on correct row
+        const partnerRetRow = res.yearlyData.find(r => r.isPartnerRetYear);
+        check(`[couples matrix/${sc.name}] isPartnerRetYear on age ${sc.expectedPartnerRetPrimaryAge}`,
+            partnerRetRow && partnerRetRow.age === sc.expectedPartnerRetPrimaryAge,
+            `got age=${partnerRetRow?.age}, expected=${sc.expectedPartnerRetPrimaryAge}`);
+
+        // 4. Assert working years income flows
+        for (const yr of sc.checkWorkingYears) {
+            const row = res.yearlyData.find(r => r.age === yr);
+            if (row) {
+                check(`[couples matrix/${sc.name}] working income at age ${yr} > 0`,
+                    row.income > 0, `income@${yr}=${row.income}`);
+            }
+        }
+
+        // 5. Assert retired years (after both retire) employment income is 0
+        for (const yr of sc.checkRetiredYears) {
+            const row = res.yearlyData.find(r => r.age === yr);
+            if (row && yr < 60) { // before pension
+                check(`[couples matrix/${sc.name}] income at age ${yr} is 0 (both retired)`,
+                    row.income === 0, `income@${yr}=${row.income}`);
+            }
+        }
+    }
 })();
 
 // ------------------------------------------------------------

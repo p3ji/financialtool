@@ -211,7 +211,6 @@
             isPartnerRetYear: isPartnerRetAtStart,
             isPensionYear: false, isCppYear: false, isOasYear: false
         });
-        currentYearAge++;
 
         for (let m = 0; m <= maxMonths; m++) {
             const currentAge = age + m / 12;
