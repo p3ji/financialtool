@@ -274,11 +274,21 @@ function loadFormState() {
             if (!el) return;
             if (el.type === 'checkbox') {
                 el.checked = value;
-                el.dispatchEvent(new Event('change'));
             } else {
                 el.value = value;
             }
         });
+        const retSec = document.getElementById('retAgeSection');
+        if (retSec) retSec.style.display = document.getElementById('chkIncludeRetAge')?.checked ? 'block' : 'none';
+        const portSec = document.getElementById('portfolioSection');
+        if (portSec) portSec.style.display = document.getElementById('chkIncludePortfolio')?.checked ? 'block' : 'none';
+        const penSec = document.getElementById('pensionDetailsSection');
+        if (penSec) penSec.style.display = document.getElementById('chkIncludePension')?.checked ? 'block' : 'none';
+        const cppSec = document.getElementById('cppOasSection');
+        if (cppSec) cppSec.style.display = document.getElementById('chkIncludeCppOas')?.checked ? 'block' : 'none';
+
+        updatePartnerVisibility();
+        calculateRetirement();
     } catch (e) {
         console.error('Error loading form state:', e);
     }
@@ -292,7 +302,7 @@ function saveFormState() {
                      'gcPensionAge', 'gcLifetimePension', 'gcBridgeBenefit',
                      'cppStartAge', 'cppAmountAt65', 'oasStartAge', 'oasAmountAt65',
                      'rrspBalance', 'tfasaBalance', 'nonRegBalance', 'incomePropertyValue', 'rentalIncome',
-                     'partnerAge', 'partnerPensionAge', 'partnerPensionAmount',
+                     'partnerAge', 'partnerIncome', 'partnerPlannedRetAge', 'partnerPensionAge', 'partnerPensionAmount',
                      'partnerCppStartAge', 'partnerCppAmountAt65', 'partnerOasStartAge', 'partnerOasAmountAt65',
                      'chkIncludeRetAge', 'chkIncludePortfolio', 'chkIncludePension', 'chkIncludeCppOas', 'chkCouple',
                      'btnSimpleMode', 'btnGCMode', 'btnPortfolioSimple', 'btnPortfolioDetailed'];

@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node tests/run-scenarios.js",
     "test:dom": "node tests/smoke-dom.js",
-    "test:playwright": "node tests/test-playwright.js"
+    "test:playwright": "node tests/test-playwright.js",
+    "test:matrix": "node tests/test-matrix.js"
   },
   "devDependencies": {
     "jsdom": "^24.0.0",
