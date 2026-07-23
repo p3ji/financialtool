@@ -1,5 +1,7 @@
 # Wishlist Feature Specification: Planning as a Couple
 
+> **GitHub Archived Branch**: All implementation code, HTML, CSS, calculation engine math, DOM controllers, and Playwright test suites are permanently preserved on GitHub in branch [`archive/couples-feature`](https://github.com/p3ji/financialtool/tree/archive/couples-feature).
+
 This document serves as the complete technical design, architecture, math specification, UI layout, and test harness reference for implementing **Couple Mode & Staggered Retirement Support**.
 
 ---
