@@ -70,6 +70,12 @@ const inputs = {
     partnerPlannedRetAge: document.getElementById('partnerPlannedRetAge'),
     partnerIncome: document.getElementById('partnerIncome'),
     partnerAge: document.getElementById('partnerAge'),
+    partnerPensionAge: document.getElementById('partnerPensionAge'),
+    partnerPensionAmount: document.getElementById('partnerPensionAmount'),
+    partnerCppStartAge: document.getElementById('partnerCppStartAge'),
+    partnerCppAmountAt65: document.getElementById('partnerCppAmountAt65'),
+    partnerOasStartAge: document.getElementById('partnerOasStartAge'),
+    partnerOasAmountAt65: document.getElementById('partnerOasAmountAt65'),
     currentBalance: document.getElementById('currentBalance'),
     annualIncome: document.getElementById('annualIncome'),
     annualExpenses: document.getElementById('annualExpenses'),
@@ -121,9 +127,17 @@ let lastReportData = null;
 // Event Listeners
 // -------------------------------------------------------------------
 Object.entries(inputs).forEach(([key, input]) => {
-    if (input) input.addEventListener('input', calculateRetirement);
+    if (input) {
+        input.addEventListener('input', calculateRetirement);
+        input.addEventListener('change', calculateRetirement);
+    }
 });
-Object.values(gcInputs).forEach(input => input.addEventListener('input', calculateRetirement));
+Object.values(gcInputs).forEach(input => {
+    if (input) {
+        input.addEventListener('input', calculateRetirement);
+        input.addEventListener('change', calculateRetirement);
+    }
+});
 
 toggles.btnSimpleMode.addEventListener('click', () => {
     isGCMode = false;
