@@ -426,10 +426,18 @@ function calculateRetirement() {
     // the primary person's timeline (the single axis the engine simulates on)
     // via the age difference.
     // -------------------------------------------------------------------
+    const getValNum = (id, fallback = 0) => {
+        const el = document.getElementById(id);
+        if (!el) return fallback;
+        const str = String(el.value || '').replace(/[^0-9.-]/g, '');
+        const num = parseFloat(str);
+        return isNaN(num) ? fallback : num;
+    };
+
     const includeCouple = document.getElementById('chkCouple')?.checked;
-    const partnerAgeVal = includeCouple ? (parseFloat(document.getElementById('partnerAge').value) || age) : age;
-    const partnerIncome = includeCouple ? (parseFloat(document.getElementById('partnerIncome')?.value) || 0) : 0;
-    const partnerRetAgeReal = (includeCouple && includeRetAge) ? (parseFloat(document.getElementById('partnerPlannedRetAge')?.value) || 55) : 100;
+    const partnerAgeVal = includeCouple ? getValNum('partnerAge', age) : age;
+    const partnerIncome = includeCouple ? getValNum('partnerIncome', 0) : 0;
+    const partnerRetAgeReal = (includeCouple && includeRetAge) ? getValNum('partnerPlannedRetAge', 55) : 100;
 
     const ageDiff = partnerAgeVal - age;   // >0 if partner is older
     // toPrimary(partnerRealAge) → age on the primary person's timeline
@@ -447,8 +455,8 @@ function calculateRetirement() {
             hasSource = true;
         }
         if (includePension) {
-            const pPenAmt     = parseFloat(document.getElementById('partnerPensionAmount').value) || 0;
-            const pPenAgeReal = parseFloat(document.getElementById('partnerPensionAge').value) || 999;
+            const pPenAmt     = getValNum('partnerPensionAmount', 0);
+            const pPenAgeReal = getValNum('partnerPensionAge', 999);
             if (pPenAmt > 0 && pPenAgeReal < 999) {
                 p.pensionAge      = toPrimary(pPenAgeReal);
                 p.lifetimePension = pPenAmt;
@@ -458,10 +466,10 @@ function calculateRetirement() {
             }
         }
         if (includeCppOas) {
-            const pCppAgeReal = parseFloat(document.getElementById('partnerCppStartAge').value) || 65;
-            const pCppBase    = parseFloat(document.getElementById('partnerCppAmountAt65').value) || 0;
-            const pOasAgeReal = parseFloat(document.getElementById('partnerOasStartAge').value) || 65;
-            const pOasBase    = parseFloat(document.getElementById('partnerOasAmountAt65').value) || 0;
+            const pCppAgeReal = getValNum('partnerCppStartAge', 65);
+            const pCppBase    = getValNum('partnerCppAmountAt65', 0);
+            const pOasAgeReal = getValNum('partnerOasStartAge', 65);
+            const pOasBase    = getValNum('partnerOasAmountAt65', 0);
             const pCppAmt = pCppBase > 0 ? calcCppAdjusted(pCppBase, pCppAgeReal) : 0;
             const pOasAmt = pOasBase > 0 ? calcOasAdjusted(pOasBase, pOasAgeReal) : 0;
             updateAdjustmentNote('partnerCppAdjNote', pCppBase, pCppAmt, pCppAgeReal);

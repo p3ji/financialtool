@@ -9,18 +9,18 @@ const path = require('path');
     const indexPath = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
     await page.goto(indexPath);
 
-    // Exact inputs from 3rd screenshot
+    // Exact inputs from user's latest screenshot
     await page.fill('#currentAge', '38');
     await page.fill('#annualIncome', '0');
     await page.fill('#annualExpenses', '100000');
 
     await page.check('#chkCouple');
-    await page.fill('#partnerAge', '39');
+    await page.fill('#partnerAge', '35');
     await page.fill('#partnerIncome', '100000');
 
     await page.check('#chkIncludeRetAge');
     await page.fill('#plannedRetirementAge', '38');
-    await page.fill('#partnerPlannedRetAge', '55');
+    await page.fill('#partnerPlannedRetAge', '45');
 
     await page.check('#chkIncludePortfolio');
     await page.fill('#currentBalance', '1000000');
@@ -30,11 +30,11 @@ const path = require('path');
     await page.fill('#pensionAmount', '30000');
 
     await page.fill('#partnerPensionAge', '60');
-    await page.fill('#partnerPensionAmount', '60000');
+    await page.fill('#partnerPensionAmount', '0');
 
     await page.check('#chkIncludeCppOas');
     await page.fill('#cppStartAge', '65');
-    await page.fill('#cppAmountAt65', '12000');
+    await page.fill('#cppAmountAt65', '0');
 
     await page.waitForTimeout(300);
 
@@ -62,8 +62,8 @@ const path = require('path');
         };
     }));
 
-    console.log('--- DETAILED TABLE (Ages 38 to 44) ---');
-    rows.filter(r => parseInt(r.age) >= 38 && parseInt(r.age) <= 44).forEach(r => {
+    console.log('--- DETAILED TABLE (Ages 38 to 49) ---');
+    rows.filter(r => parseInt(r.age) >= 38 && parseInt(r.age) <= 49).forEach(r => {
         console.log(`Age ${r.age}: Income = ${r.income}, Expenses = ${r.expenses}, Networth = ${r.networth}`);
     });
     console.log('---------------------------------------');
