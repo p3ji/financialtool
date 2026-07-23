@@ -816,33 +816,42 @@ function calculateRetirement() {
     }
 
     // Partner milestones (couples) — positioned on the primary timeline
-    // (translated age), titled with the partner's own age.
+    // (translated age), titled with primary timeline age and partner's own age.
     if (partner) {
         if (includeCouple && includeRetAge && partnerRetAgeReal < 100 && partnerPlannedRetAge > age) {
+            const ageTitle = Math.abs(partnerPlannedRetAge - partnerRetAgeReal) < 1e-6
+                ? `Age ${formatNumber(partnerPlannedRetAge)}`
+                : `Age ${formatNumber(partnerPlannedRetAge)} · Partner Age ${formatNumber(partnerRetAgeReal)}`;
             events.push({ age: partnerPlannedRetAge, html: `
         <li class="timeline-item timeline-emp-ret">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
-                <h4>Partner's Employment Retirement (partner age ${formatNumber(partnerRetAgeReal)})</h4>
+                <h4>Partner's Employment Retirement (${ageTitle})</h4>
                 <p>Partner stops working. ${describeIncomeAt(partnerPlannedRetAge, expenses, benefits, isGCMode)}</p>
             </div>
         </li>` });
         }
         if (partner.pensionAge != null && partner.pensionAge > age) {
+            const ageTitle = Math.abs(partner.pensionAge - partner._pensionAgeReal) < 1e-6
+                ? `Age ${formatNumber(partner.pensionAge)}`
+                : `Age ${formatNumber(partner.pensionAge)} · Partner Age ${formatNumber(partner._pensionAgeReal)}`;
             events.push({ age: partner.pensionAge, html: `
         <li class="timeline-item">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
-                <h4>Partner's DB Pension Starts (partner age ${formatNumber(partner._pensionAgeReal)})</h4>
+                <h4>Partner's DB Pension Starts (${ageTitle})</h4>
                 <p>${describeIncomeAt(partner.pensionAge, expenses, benefits, isGCMode)}</p>
             </div>
         </li>` });
         }
         const partnerCppOasSame = partner.cppAge != null && partner.oasAge != null && Math.abs(partner.cppAge - partner.oasAge) < 1e-6;
         if (partner.cppAge != null && partner.cppAge > age) {
+            const ageTitle = Math.abs(partner.cppAge - partner._cppAgeReal) < 1e-6
+                ? `Age ${formatNumber(partner.cppAge)}`
+                : `Age ${formatNumber(partner.cppAge)} · Partner Age ${formatNumber(partner._cppAgeReal)}`;
             const title = partnerCppOasSame
-                ? `Partner's CPP &amp; OAS Start (partner age ${formatNumber(partner._cppAgeReal)})`
-                : `Partner's CPP Starts (partner age ${formatNumber(partner._cppAgeReal)})`;
+                ? `Partner's CPP &amp; OAS Start (${ageTitle})`
+                : `Partner's CPP Starts (${ageTitle})`;
             events.push({ age: partner.cppAge, html: `
         <li class="timeline-item timeline-cpp">
             <div class="timeline-marker"></div>
@@ -853,11 +862,14 @@ function calculateRetirement() {
         </li>` });
         }
         if (partner.oasAge != null && partner.oasAge > age && !partnerCppOasSame) {
+            const ageTitle = Math.abs(partner.oasAge - partner._oasAgeReal) < 1e-6
+                ? `Age ${formatNumber(partner.oasAge)}`
+                : `Age ${formatNumber(partner.oasAge)} · Partner Age ${formatNumber(partner._oasAgeReal)}`;
             events.push({ age: partner.oasAge, html: `
         <li class="timeline-item timeline-oas">
             <div class="timeline-marker"></div>
             <div class="timeline-content">
-                <h4>Partner's OAS Starts (partner age ${formatNumber(partner._oasAgeReal)})</h4>
+                <h4>Partner's OAS Starts (${ageTitle})</h4>
                 <p>${describeIncomeAt(partner.oasAge, expenses, benefits, isGCMode)}</p>
             </div>
         </li>` });
