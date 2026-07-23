@@ -195,14 +195,20 @@
         let sumIncome = 0, sumExpenses = 0, sumROI = 0;
         let startBalOfYear = balance;
         let currentYearAge = Math.floor(age);
-        let isFIYear = false, isEmpRetYear = false;
+        let isFIYear = false, isEmpRetYear = false, isPrimaryRetYear = false, isPartnerRetYear = false;
         let isPensionYear = false, isCppYear = false, isOasYear = false;
+
+        const isPrimaryRetAtStart = stopEmploymentAtRet && (monthsToEmpStop === 0);
+        const isPartnerRetAtStart = stopEmploymentAtRet && (partnerPlannedRetAge < 100) && (monthsToPartnerEmpStop === 0);
 
         // Year 0 row (opening snapshot)
         yearlyData.push({
             age: currentYearAge, income: 0, expenses: 0, roi: 0,
             percentCovered: 0, changeInNetworth: 0, networth: balance,
-            isFIYear: false, isEmpRetYear: false,
+            isFIYear: false,
+            isEmpRetYear: isPrimaryRetAtStart || isPartnerRetAtStart,
+            isPrimaryRetYear: isPrimaryRetAtStart,
+            isPartnerRetYear: isPartnerRetAtStart,
             isPensionYear: false, isCppYear: false, isOasYear: false
         });
         currentYearAge++;
@@ -243,7 +249,17 @@
             }
 
             // Transition markers for the table
-            if (m === monthsToEmpStop || m === monthsToPartnerEmpStop) isEmpRetYear = true;
+            if (stopEmploymentAtRet) {
+                if (m === monthsToEmpStop && monthsToEmpStop > 0) {
+                    isPrimaryRetYear = true;
+                    isEmpRetYear = true;
+                }
+                if (m === monthsToPartnerEmpStop && monthsToPartnerEmpStop > 0 && partnerPlannedRetAge < 100) {
+                    isPartnerRetYear = true;
+                    isEmpRetYear = true;
+                }
+            }
+
             if (benefits.pensionAge < 999 && currentAge >= benefits.pensionAge && currentAge - 1/12 < benefits.pensionAge) isPensionYear = true;
             if (benefits.cppAge     < 999 && currentAge >= benefits.cppAge     && currentAge - 1/12 < benefits.cppAge)     isCppYear    = true;
             if (benefits.oasAge     < 999 && currentAge >= benefits.oasAge     && currentAge - 1/12 < benefits.oasAge)     isOasYear    = true;
@@ -273,12 +289,13 @@
                     percentCovered: sumExpenses > 0 ? (sumROI / sumExpenses) * 100 : 0,
                     changeInNetworth: bal - startBalOfYear,
                     networth: bal,
-                    isFIYear, isEmpRetYear, isPensionYear, isCppYear, isOasYear
+                    isFIYear, isEmpRetYear, isPrimaryRetYear, isPartnerRetYear,
+                    isPensionYear, isCppYear, isOasYear
                 });
                 currentYearAge++;
                 sumIncome = sumExpenses = sumROI = 0;
                 startBalOfYear = bal;
-                isFIYear = isEmpRetYear = isPensionYear = isCppYear = isOasYear = false;
+                isFIYear = isEmpRetYear = isPrimaryRetYear = isPartnerRetYear = isPensionYear = isCppYear = isOasYear = false;
             }
         }
 

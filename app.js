@@ -908,14 +908,27 @@ function renderDetailedTable(yearlyData, roi) {
 
     yearlyData.forEach(row => {
         const tr = document.createElement('tr');
-        if      (row.isFIYear)       tr.classList.add('fi-row');
-        else if (row.isEmpRetYear)   tr.classList.add('emp-ret-row');
-        else if (row.isPensionYear)  tr.classList.add('pension-row');
-        else if (row.isCppYear)      tr.classList.add('cpp-row');
-        else if (row.isOasYear)      tr.classList.add('oas-row');
+        if      (row.isFIYear)         tr.classList.add('fi-row');
+        else if (row.isPrimaryRetYear) tr.classList.add('emp-ret-row');
+        else if (row.isPartnerRetYear) tr.classList.add('partner-ret-row');
+        else if (row.isEmpRetYear)     tr.classList.add('emp-ret-row');
+        else if (row.isPensionYear)    tr.classList.add('pension-row');
+        else if (row.isCppYear)        tr.classList.add('cpp-row');
+        else if (row.isOasYear)        tr.classList.add('oas-row');
+
+        let ageLabel = `${row.age}`;
+        if (row.isPrimaryRetYear && row.isPartnerRetYear) {
+            ageLabel += ` <span class="table-tag tag-ret">Both Retire</span>`;
+        } else if (row.isPrimaryRetYear) {
+            ageLabel += ` <span class="table-tag tag-ret">You Retire</span>`;
+        } else if (row.isPartnerRetYear) {
+            ageLabel += ` <span class="table-tag tag-partner-ret">Partner Retires</span>`;
+        } else if (row.isFIYear) {
+            ageLabel += ` <span class="table-tag tag-fi">FI</span>`;
+        }
 
         tr.innerHTML = `
-            <td>${row.age}</td>
+            <td>${ageLabel}</td>
             <td>${formatCurrency(row.income)}</td>
             <td>${formatCurrency(row.expenses)}</td>
             <td>${formatCurrency(row.roi)}</td>

@@ -80,8 +80,11 @@ const path = require('path');
 
     const rows = await page.$$eval('#detailedTable tbody tr', trs => trs.map(tr => {
         const tds = tr.querySelectorAll('td');
+        const rawAge = tds[0]?.textContent.trim() || '';
+        const ageNum = rawAge.split(' ')[0];
         return {
-            age: tds[0]?.textContent.trim(),
+            rawAge,
+            age: ageNum,
             income: tds[1]?.textContent.trim(),
             expenses: tds[2]?.textContent.trim()
         };
