@@ -156,6 +156,7 @@ When a chat session produces bugs, decisions, or changes, **route them here:**
 
 ## Pending Features / Decisions
 *(Log decisions and new feature requests here)*
+- **Couple / Spouse Mode & Staggered Retirement**: Full feature specification, math architecture, and DOM design are documented in [`couplesfeature.md`](file:///c:/Users/pushp/Documents/Projects/financialtool/couplesfeature.md) for future reference.
 - Gather StatCan demographic data (income, spending by age/location/household/income)
 - Verify data harmonization across income & spending breakdowns
 - UI enhancements: collapsible assumptions, report-style view (separate tab)
